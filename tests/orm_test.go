@@ -92,8 +92,14 @@ func TestInsert(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
-	if _, err := db.Table("users").Where("name", "bob").Update(map[string]any{"age": 35}); err != nil {
+	res, err := db.Table("users").Where("name", "bob").Update(map[string]any{"age": 35})
+	if err != nil {
 		t.Fatalf("update: %v", err)
+	}
+	if aff, err := res.RowsAffected(); err != nil {
+		t.Fatalf("rows affected: %v", err)
+	} else if aff != 1 {
+		t.Errorf("expected 1 row affected, got %d", aff)
 	}
 	var row map[string]any
 	if err := db.Table("users").Where("name", "bob").FirstMap(&row); err != nil {

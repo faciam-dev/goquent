@@ -356,21 +356,47 @@ func copyBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.UpdateQueryBuild
 	// copy where
 	srcWb := src.GetWhereBuilder()
 	dstWb := dst.GetWhereBuilder()
-	copyPtrField(dstWb, "query", reflect.ValueOf(srcWb).Elem().FieldByName("query").Pointer())
+	_ = copyPtrField(dstWb, "query", reflect.ValueOf(srcWb).Elem().FieldByName("query").Pointer())
 
 	// copy join
 	srcJb := src.GetJoinBuilder()
 	dstJb := dst.GetJoinBuilder()
-	copyPtrField(dstJb, "Joins", reflect.ValueOf(srcJb).Elem().FieldByName("Joins").Pointer())
+	// deep copy joins to avoid sharing the slice between builders
+	joinsVal := reflect.ValueOf(srcJb).Elem().FieldByName("Joins")
+	newJoins := reflect.New(joinsVal.Elem().Type())
+	newJoins.Elem().Set(joinsVal.Elem())
+	if slice := joinsVal.Elem().FieldByName("Joins"); slice.IsValid() && !slice.IsNil() {
+		cp := reflect.MakeSlice(slice.Type().Elem(), slice.Elem().Len(), slice.Elem().Len())
+		reflect.Copy(cp, slice.Elem())
+		newJoins.Elem().FieldByName("Joins").Set(cp.Addr())
+	}
+	if slice := joinsVal.Elem().FieldByName("JoinClauses"); slice.IsValid() && !slice.IsNil() {
+		cp := reflect.MakeSlice(slice.Type().Elem(), slice.Elem().Len(), slice.Elem().Len())
+		reflect.Copy(cp, slice.Elem())
+		newJoins.Elem().FieldByName("JoinClauses").Set(cp.Addr())
+	}
+	if slice := joinsVal.Elem().FieldByName("LateralJoins"); slice.IsValid() && !slice.IsNil() {
+		cp := reflect.MakeSlice(slice.Type().Elem(), slice.Elem().Len(), slice.Elem().Len())
+		reflect.Copy(cp, slice.Elem())
+		newJoins.Elem().FieldByName("LateralJoins").Set(cp.Addr())
+	}
+	_ = copyPtrField(dstJb, "Joins", newJoins.Pointer())
 
 	// copy order
 	srcOb := src.GetOrderByBuilder()
 	dstOb := dst.GetOrderByBuilder()
-	copyPtrField(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order").Pointer())
+	_ = copyPtrField(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order").Pointer())
 }
 
-func copyPtrField(target any, field string, ptr uintptr) {
+func copyPtrField(target any, field string, ptr uintptr) error {
 	v := reflect.ValueOf(target).Elem().FieldByName(field)
+	if !v.IsValid() {
+		return fmt.Errorf("field %q does not exist in target", field)
+	}
+	if !v.CanSet() {
+		return fmt.Errorf("field %q is not settable", field)
+	}
 	p := unsafe.Pointer(v.UnsafeAddr())
 	*(*uintptr)(p) = ptr
+	return nil
 }
