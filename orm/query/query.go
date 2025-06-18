@@ -356,47 +356,55 @@ func copyBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.UpdateQueryBuild
 	// copy where
 	srcWb := src.GetWhereBuilder()
 	dstWb := dst.GetWhereBuilder()
-	_ = copyPtrField(dstWb, "query", reflect.ValueOf(srcWb).Elem().FieldByName("query").Pointer())
+	_ = setFieldValue(dstWb, "query", reflect.ValueOf(srcWb).Elem().FieldByName("query"))
 
 	// copy join
 	srcJb := src.GetJoinBuilder()
 	dstJb := dst.GetJoinBuilder()
-	// deep copy joins to avoid sharing the slice between builders
-	joinsVal := reflect.ValueOf(srcJb).Elem().FieldByName("Joins")
-	newJoins := reflect.New(joinsVal.Elem().Type())
-	newJoins.Elem().Set(joinsVal.Elem())
-	if slice := joinsVal.Elem().FieldByName("Joins"); slice.IsValid() && !slice.IsNil() {
-		cp := reflect.MakeSlice(slice.Type().Elem(), slice.Elem().Len(), slice.Elem().Len())
-		reflect.Copy(cp, slice.Elem())
-		newJoins.Elem().FieldByName("Joins").Set(cp.Addr())
-	}
-	if slice := joinsVal.Elem().FieldByName("JoinClauses"); slice.IsValid() && !slice.IsNil() {
-		cp := reflect.MakeSlice(slice.Type().Elem(), slice.Elem().Len(), slice.Elem().Len())
-		reflect.Copy(cp, slice.Elem())
-		newJoins.Elem().FieldByName("JoinClauses").Set(cp.Addr())
-	}
-	if slice := joinsVal.Elem().FieldByName("LateralJoins"); slice.IsValid() && !slice.IsNil() {
-		cp := reflect.MakeSlice(slice.Type().Elem(), slice.Elem().Len(), slice.Elem().Len())
-		reflect.Copy(cp, slice.Elem())
-		newJoins.Elem().FieldByName("LateralJoins").Set(cp.Addr())
-	}
-	_ = copyPtrField(dstJb, "Joins", newJoins.Pointer())
+	// deep copy joins to avoid sharing slices between builders. The query
+	// builder does not expose a cloning API, so reflection is used here.
+	newJoins := deepCopyJoins(srcJb)
+	_ = setFieldValue(dstJb, "Joins", newJoins)
 
 	// copy order
 	srcOb := src.GetOrderByBuilder()
 	dstOb := dst.GetOrderByBuilder()
-	_ = copyPtrField(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order").Pointer())
+	_ = setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
 }
 
-func copyPtrField(target any, field string, ptr uintptr) error {
+// deepCopyJoins clones the internal Joins struct of a JoinBuilder using
+// reflection. This avoids sharing slices between builders.
+func deepCopyJoins(jb any) reflect.Value {
+	joinsVal := reflect.ValueOf(jb).Elem().FieldByName("Joins")
+	newJoins := reflect.New(joinsVal.Elem().Type())
+	newJoins.Elem().Set(joinsVal.Elem())
+	for _, name := range []string{"Joins", "JoinClauses", "LateralJoins"} {
+		slice := joinsVal.Elem().FieldByName(name)
+		if slice.IsValid() && !slice.IsNil() {
+			cp := reflect.MakeSlice(slice.Type().Elem(), slice.Elem().Len(), slice.Elem().Len())
+			reflect.Copy(cp, slice.Elem())
+			newJoins.Elem().FieldByName(name).Set(cp.Addr())
+		}
+	}
+	return newJoins
+}
+
+// setFieldValue assigns value to an exported or unexported field using
+// reflection. Unsafe pointer manipulation is used only when the field is not
+// settable. This relies on the current struct layout of the builder types.
+func setFieldValue(target any, field string, value reflect.Value) error {
 	v := reflect.ValueOf(target).Elem().FieldByName(field)
 	if !v.IsValid() {
 		return fmt.Errorf("field %q does not exist in target", field)
 	}
-	if !v.CanSet() {
-		return fmt.Errorf("field %q is not settable", field)
+	if v.Type() != value.Type() {
+		return fmt.Errorf("type mismatch for field %q", field)
+	}
+	if v.CanSet() {
+		v.Set(value)
+		return nil
 	}
 	p := unsafe.Pointer(v.UnsafeAddr())
-	*(*uintptr)(p) = ptr
+	reflect.NewAt(v.Type(), p).Elem().Set(value)
 	return nil
 }
