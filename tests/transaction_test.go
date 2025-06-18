@@ -33,15 +33,18 @@ func TestTransactionRollback(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
 
-	_ = db.Transaction(func(tx orm.Tx) error {
+	err := db.Transaction(func(tx orm.Tx) error {
 		if _, err := tx.Table("users").Insert(map[string]any{"name": "eve", "age": 50}); err != nil {
 			return err
 		}
 		return fmt.Errorf("rollback")
 	})
+	if err == nil || err.Error() != "rollback" {
+		t.Fatalf("expected rollback error, got %v", err)
+	}
 
 	var row map[string]any
-	err := db.Table("users").Where("name", "eve").FirstMap(&row)
+	err = db.Table("users").Where("name", "eve").FirstMap(&row)
 	if err != sql.ErrNoRows {
 		t.Fatalf("expected no rows after rollback, got %v", err)
 	}

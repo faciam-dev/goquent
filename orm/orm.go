@@ -39,8 +39,8 @@ type Tx struct{ *DB }
 // Transaction executes fn in a transaction.
 func (db *DB) Transaction(fn func(tx Tx) error) error {
 	return db.drv.Transaction(func(t driver.Tx) error {
-		txdb := &DB{drv: db.drv, exec: t.Tx}
-		return fn(Tx{txdb})
+		txDB := &DB{drv: db.drv, exec: t.Tx}
+		return fn(Tx{txDB})
 	})
 }
 
