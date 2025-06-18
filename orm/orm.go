@@ -33,11 +33,14 @@ func Open(dsn string) (*DB, error) {
 // Close closes underlying DB.
 func (db *DB) Close() error { return db.drv.Close() }
 
+// Tx represents a transaction-scoped DB wrapper.
+type Tx struct{ *DB }
+
 // Transaction executes fn in a transaction.
-func (db *DB) Transaction(fn func(tx *DB) error) error {
+func (db *DB) Transaction(fn func(tx Tx) error) error {
 	return db.drv.Transaction(func(t driver.Tx) error {
-		txdb := &DB{drv: db.drv, exec: t.Tx}
-		return fn(txdb)
+		txDB := &DB{drv: db.drv, exec: t.Tx}
+		return fn(Tx{txDB})
 	})
 }
 
