@@ -389,9 +389,8 @@ func deepCopyJoins(jb any) reflect.Value {
 	return newJoins
 }
 
-// setFieldValue assigns value to an exported or unexported field using
-// reflection. Unsafe pointer manipulation is used only when the field is not
-// settable. This relies on the current struct layout of the builder types.
+// setFieldValue assigns value to an exported field using reflection.
+// It does not manipulate unexported fields to ensure safety and maintainability.
 func setFieldValue(target any, field string, value reflect.Value) error {
 	v := reflect.ValueOf(target).Elem().FieldByName(field)
 	if !v.IsValid() {
