@@ -29,13 +29,25 @@ func setupDB(t testing.TB) *orm.DB {
 	if err != nil {
 		t.Fatalf("create table: %v", err)
 	}
+	_, err = stdDB.Exec(`CREATE TABLE IF NOT EXISTS profiles (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, bio VARCHAR(255))`)
+	if err != nil {
+		t.Fatalf("create profiles table: %v", err)
+	}
 	_, err = stdDB.Exec("TRUNCATE TABLE users")
 	if err != nil {
 		t.Fatalf("truncate table: %v", err)
 	}
+	_, err = stdDB.Exec("TRUNCATE TABLE profiles")
+	if err != nil {
+		t.Fatalf("truncate profiles: %v", err)
+	}
 	_, err = stdDB.Exec("INSERT INTO users(name, age) VALUES ('alice', 30), ('bob', 25)")
 	if err != nil {
-		t.Fatalf("insert: %v", err)
+		t.Fatalf("insert users: %v", err)
+	}
+	_, err = stdDB.Exec("INSERT INTO profiles(user_id, bio) VALUES (1, 'go developer'), (2, 'python developer')")
+	if err != nil {
+		t.Fatalf("insert profiles: %v", err)
 	}
 	return db
 }
