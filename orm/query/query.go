@@ -2,6 +2,7 @@ package query
 
 import (
 	"database/sql"
+	"fmt"
 
 	qbapi "github.com/faciam-dev/goquent-query-builder/api"
 	qbmysql "github.com/faciam-dev/goquent-query-builder/database/mysql"
@@ -18,6 +19,7 @@ type executor interface {
 type Query struct {
 	builder *qbapi.SelectQueryBuilder
 	exec    executor
+	err     error
 }
 
 // New creates a Query with given db and table.
@@ -35,19 +37,30 @@ func (q *Query) Select(cols ...string) *Query {
 
 // Where appends a condition.
 func (q *Query) Where(col string, args ...any) *Query {
+	if q.err != nil {
+		return q
+	}
 	switch len(args) {
 	case 1:
 		q.builder.Where(col, "=", args[0])
 	case 2:
-		q.builder.Where(col, args[0].(string), args[1])
+		op, ok := args[0].(string)
+		if !ok {
+			q.err = fmt.Errorf("invalid operator type")
+			return q
+		}
+		q.builder.Where(col, op, args[1])
 	default:
-		// invalid usage
+		q.err = fmt.Errorf("invalid Where usage")
 	}
 	return q
 }
 
 // First scans the first result into dest struct.
 func (q *Query) First(dest any) error {
+	if q.err != nil {
+		return q.err
+	}
 	sqlStr, args, err := q.builder.Build()
 	if err != nil {
 		return err
@@ -62,6 +75,9 @@ func (q *Query) First(dest any) error {
 
 // FirstMap scans first row into map.
 func (q *Query) FirstMap(dest *map[string]any) error {
+	if q.err != nil {
+		return q.err
+	}
 	sqlStr, args, err := q.builder.Build()
 	if err != nil {
 		return err
@@ -81,6 +97,9 @@ func (q *Query) FirstMap(dest *map[string]any) error {
 
 // GetMaps scans all rows into slice of maps.
 func (q *Query) GetMaps(dest *[]map[string]any) error {
+	if q.err != nil {
+		return q.err
+	}
 	sqlStr, args, err := q.builder.Build()
 	if err != nil {
 		return err

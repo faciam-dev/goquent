@@ -15,7 +15,7 @@ type User struct {
 	Age  int    `orm:"column=age"`
 }
 
-func setupDB(t *testing.T) *orm.DB {
+func setupDB(t testing.TB) *orm.DB {
 	dsn := "root:password@tcp(localhost:3306)/testdb?parseTime=true"
 	db, err := orm.Open(dsn)
 	if err != nil {
@@ -29,7 +29,10 @@ func setupDB(t *testing.T) *orm.DB {
 	if err != nil {
 		t.Fatalf("create table: %v", err)
 	}
-	stdDB.Exec("TRUNCATE TABLE users")
+	_, err = stdDB.Exec("TRUNCATE TABLE users")
+	if err != nil {
+		t.Fatalf("truncate table: %v", err)
+	}
 	_, err = stdDB.Exec("INSERT INTO users(name, age) VALUES ('alice', 30), ('bob', 25)")
 	if err != nil {
 		t.Fatalf("insert: %v", err)
@@ -50,7 +53,7 @@ func TestFirstMap(t *testing.T) {
 }
 
 func BenchmarkScannerMap(b *testing.B) {
-	db := setupDB(&testing.T{})
+	db := setupDB(b)
 	defer db.Close()
 	for i := 0; i < b.N; i++ {
 		var row map[string]any
@@ -61,7 +64,7 @@ func BenchmarkScannerMap(b *testing.B) {
 }
 
 func BenchmarkScannerStruct(b *testing.B) {
-	db := setupDB(&testing.T{})
+	db := setupDB(b)
 	defer db.Close()
 	for i := 0; i < b.N; i++ {
 		var user User
