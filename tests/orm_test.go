@@ -109,3 +109,24 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("expected age 35, got %v", row["age"])
 	}
 }
+
+func TestDelete(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	res, err := db.Table("users").Where("name", "alice").Delete()
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if aff, err := res.RowsAffected(); err != nil {
+		t.Fatalf("rows affected: %v", err)
+	} else if aff != 1 {
+		t.Errorf("expected 1 row affected, got %d", aff)
+	}
+
+	var row map[string]any
+	err = db.Table("users").Where("name", "alice").FirstMap(&row)
+	if err != sql.ErrNoRows {
+		t.Fatalf("expected ErrNoRows, got %v", err)
+	}
+}
