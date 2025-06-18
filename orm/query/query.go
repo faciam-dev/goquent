@@ -3,6 +3,8 @@ package query
 import (
 	"database/sql"
 	"fmt"
+	"reflect"
+	"unsafe"
 
 	qbapi "github.com/faciam-dev/goquent-query-builder/api"
 	qbmysql "github.com/faciam-dev/goquent-query-builder/database/mysql"
@@ -335,4 +337,73 @@ func (q *Query) InsertUsing(columns []string, sub *Query) (sql.Result, error) {
 		return nil, err
 	}
 	return q.exec.Exec(sqlStr, args...)
+}
+
+// Update executes an UPDATE with the given data.
+func (q *Query) Update(data map[string]any) (sql.Result, error) {
+	ub := qbapi.NewUpdateQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ub.Table(q.builder.GetQuery().Table.Name).Update(data)
+	copyBuilderState(q.builder, ub)
+	sqlStr, args, err := ub.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.exec.Exec(sqlStr, args...)
+}
+
+// copyBuilderState duplicates where, join and order clauses from src to dst.
+func copyBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.UpdateQueryBuilder) {
+	// copy where
+	srcWb := src.GetWhereBuilder()
+	dstWb := dst.GetWhereBuilder()
+	_ = setFieldValue(dstWb, "query", reflect.ValueOf(srcWb).Elem().FieldByName("query"))
+
+	// copy join
+	srcJb := src.GetJoinBuilder()
+	dstJb := dst.GetJoinBuilder()
+	// deep copy joins to avoid sharing slices between builders. The query
+	// builder does not expose a cloning API, so reflection is used here.
+	newJoins := deepCopyJoins(srcJb)
+	_ = setFieldValue(dstJb, "Joins", newJoins)
+
+	// copy order
+	srcOb := src.GetOrderByBuilder()
+	dstOb := dst.GetOrderByBuilder()
+	_ = setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
+}
+
+// deepCopyJoins clones the internal Joins struct of a JoinBuilder using
+// reflection. This avoids sharing slices between builders.
+func deepCopyJoins(jb any) reflect.Value {
+	joinsVal := reflect.ValueOf(jb).Elem().FieldByName("Joins")
+	newJoins := reflect.New(joinsVal.Elem().Type())
+	newJoins.Elem().Set(joinsVal.Elem())
+	for _, name := range []string{"Joins", "JoinClauses", "LateralJoins"} {
+		slice := joinsVal.Elem().FieldByName(name)
+		if slice.IsValid() && !slice.IsNil() {
+			cp := reflect.MakeSlice(slice.Type().Elem(), slice.Elem().Len(), slice.Elem().Len())
+			reflect.Copy(cp, slice.Elem())
+			newJoins.Elem().FieldByName(name).Set(cp.Addr())
+		}
+	}
+	return newJoins
+}
+
+// setFieldValue assigns value to an exported field using reflection.
+// It does not manipulate unexported fields to ensure safety and maintainability.
+func setFieldValue(target any, field string, value reflect.Value) error {
+	v := reflect.ValueOf(target).Elem().FieldByName(field)
+	if !v.IsValid() {
+		return fmt.Errorf("field %q does not exist in target", field)
+	}
+	if v.Type() != value.Type() {
+		return fmt.Errorf("type mismatch for field %q", field)
+	}
+	if v.CanSet() {
+		v.Set(value)
+		return nil
+	}
+	p := unsafe.Pointer(v.UnsafeAddr())
+	reflect.NewAt(v.Type(), p).Elem().Set(value)
+	return nil
 }
