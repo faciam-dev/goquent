@@ -73,3 +73,18 @@ func BenchmarkScannerStruct(b *testing.B) {
 		}
 	}
 }
+
+func TestInsert(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	if _, err := db.Table("users").Insert(map[string]any{"name": "charlie", "age": 40}); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+	var row map[string]any
+	if err := db.Table("users").Where("name", "charlie").FirstMap(&row); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if row["age"] != int64(40) {
+		t.Errorf("expected age 40, got %v", row["age"])
+	}
+}
