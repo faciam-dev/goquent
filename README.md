@@ -6,6 +6,7 @@ It currently supports MySQL only.
 ## Usage
 ```go
 import "goquent/orm/conv"
+import "log"
 
 orm, _ := orm.Open("root:password@tcp(localhost:3306)/testdb?parseTime=true")
 user := new(User)
@@ -15,7 +16,10 @@ var row map[string]any
 err = orm.Table("users").Where("id", 1).FirstMap(&row)
 
 // fetch a typed value from a map
-id, _ := conv.Value[uint64](row, "id")
+id, err := conv.Value[uint64](row, "id")
+if err != nil {
+    log.Fatal(err)
+}
 
 var rows []map[string]any
 err = orm.Table("users").Where("age", ">", 20).GetMaps(&rows)
