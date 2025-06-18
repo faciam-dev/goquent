@@ -3,6 +3,8 @@ package query
 import (
 	"database/sql"
 	"fmt"
+	"reflect"
+	"unsafe"
 
 	qbapi "github.com/faciam-dev/goquent-query-builder/api"
 	qbmysql "github.com/faciam-dev/goquent-query-builder/database/mysql"
@@ -335,4 +337,40 @@ func (q *Query) InsertUsing(columns []string, sub *Query) (sql.Result, error) {
 		return nil, err
 	}
 	return q.exec.Exec(sqlStr, args...)
+}
+
+// Update executes an UPDATE with the given data.
+func (q *Query) Update(data map[string]any) (sql.Result, error) {
+	ub := qbapi.NewUpdateQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ub.Table(q.builder.GetQuery().Table.Name).Update(data)
+	copyBuilderState(q.builder, ub)
+	sqlStr, args, err := ub.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.exec.Exec(sqlStr, args...)
+}
+
+// copyBuilderState duplicates where, join and order clauses from src to dst.
+func copyBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.UpdateQueryBuilder) {
+	// copy where
+	srcWb := src.GetWhereBuilder()
+	dstWb := dst.GetWhereBuilder()
+	copyPtrField(dstWb, "query", reflect.ValueOf(srcWb).Elem().FieldByName("query").Pointer())
+
+	// copy join
+	srcJb := src.GetJoinBuilder()
+	dstJb := dst.GetJoinBuilder()
+	copyPtrField(dstJb, "Joins", reflect.ValueOf(srcJb).Elem().FieldByName("Joins").Pointer())
+
+	// copy order
+	srcOb := src.GetOrderByBuilder()
+	dstOb := dst.GetOrderByBuilder()
+	copyPtrField(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order").Pointer())
+}
+
+func copyPtrField(target any, field string, ptr uintptr) {
+	v := reflect.ValueOf(target).Elem().FieldByName(field)
+	p := unsafe.Pointer(v.UnsafeAddr())
+	*(*uintptr)(p) = ptr
 }

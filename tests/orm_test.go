@@ -88,3 +88,18 @@ func TestInsert(t *testing.T) {
 		t.Errorf("expected age 40, got %v", row["age"])
 	}
 }
+
+func TestUpdate(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	if _, err := db.Table("users").Where("name", "bob").Update(map[string]any{"age": 35}); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	var row map[string]any
+	if err := db.Table("users").Where("name", "bob").FirstMap(&row); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if row["age"] != int64(35) {
+		t.Errorf("expected age 35, got %v", row["age"])
+	}
+}
