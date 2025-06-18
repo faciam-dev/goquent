@@ -351,6 +351,18 @@ func (q *Query) Update(data map[string]any) (sql.Result, error) {
 	return q.exec.Exec(sqlStr, args...)
 }
 
+// Delete executes a DELETE query using current conditions.
+func (q *Query) Delete() (sql.Result, error) {
+	db := qbapi.NewDeleteQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	db.Table(q.builder.GetQuery().Table.Name).Delete()
+	copyBuilderStateDelete(q.builder, db)
+	sqlStr, args, err := db.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.exec.Exec(sqlStr, args...)
+}
+
 // copyBuilderState duplicates where, join and order clauses from src to dst.
 func copyBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.UpdateQueryBuilder) {
 	// copy where
@@ -363,6 +375,25 @@ func copyBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.UpdateQueryBuild
 	dstJb := dst.GetJoinBuilder()
 	// deep copy joins to avoid sharing slices between builders. The query
 	// builder does not expose a cloning API, so reflection is used here.
+	newJoins := deepCopyJoins(srcJb)
+	_ = setFieldValue(dstJb, "Joins", newJoins)
+
+	// copy order
+	srcOb := src.GetOrderByBuilder()
+	dstOb := dst.GetOrderByBuilder()
+	_ = setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
+}
+
+// copyBuilderStateDelete duplicates where, join and order clauses from src to a DeleteQueryBuilder.
+func copyBuilderStateDelete(src *qbapi.SelectQueryBuilder, dst *qbapi.DeleteQueryBuilder) {
+	// copy where
+	srcWb := src.GetWhereBuilder()
+	dstWb := dst.GetWhereBuilder()
+	_ = setFieldValue(dstWb, "query", reflect.ValueOf(srcWb).Elem().FieldByName("query"))
+
+	// copy join
+	srcJb := src.GetJoinBuilder()
+	dstJb := dst.GetJoinBuilder()
 	newJoins := deepCopyJoins(srcJb)
 	_ = setFieldValue(dstJb, "Joins", newJoins)
 
