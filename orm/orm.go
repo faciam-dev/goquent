@@ -12,6 +12,7 @@ import (
 // executor abstracts sql.DB and sql.Tx.
 type executor interface {
 	Query(query string, args ...any) (*sql.Rows, error)
+	Exec(query string, args ...any) (sql.Result, error)
 }
 
 // DB provides main ORM interface.

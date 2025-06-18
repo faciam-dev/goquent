@@ -13,6 +13,7 @@ import (
 // executor abstracts sql.DB and sql.Tx.
 type executor interface {
 	Query(query string, args ...any) (*sql.Rows, error)
+	Exec(query string, args ...any) (sql.Result, error)
 }
 
 // Query wraps goquent QueryBuilder and the executor.
@@ -302,3 +303,36 @@ func (q *Query) Dump() (string, []any, error) { return q.builder.Dump() }
 
 // RawSQL returns interpolated SQL for debugging.
 func (q *Query) RawSQL() (string, error) { return q.builder.RawSql() }
+
+// Insert executes an INSERT with the given data.
+func (q *Query) Insert(data map[string]any) (sql.Result, error) {
+	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib.Table(q.builder.GetQuery().Table.Name).Insert(data)
+	sqlStr, args, err := ib.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.exec.Exec(sqlStr, args...)
+}
+
+// InsertBatch executes a bulk INSERT with the given slice of data maps.
+func (q *Query) InsertBatch(data []map[string]any) (sql.Result, error) {
+	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib.Table(q.builder.GetQuery().Table.Name).InsertBatch(data)
+	sqlStr, args, err := ib.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.exec.Exec(sqlStr, args...)
+}
+
+// InsertUsing executes an INSERT INTO ... SELECT statement using columns from a subquery.
+func (q *Query) InsertUsing(columns []string, sub *Query) (sql.Result, error) {
+	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib.Table(q.builder.GetQuery().Table.Name).InsertUsing(columns, sub.builder)
+	sqlStr, args, err := ib.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.exec.Exec(sqlStr, args...)
+}
