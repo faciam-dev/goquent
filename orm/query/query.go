@@ -160,20 +160,20 @@ func (q *Query) Sum(col string) *Query { q.builder.Sum(col); return q }
 func (q *Query) Avg(col string) *Query { q.builder.Avg(col); return q }
 
 // Join adds INNER JOIN clause.
-func (q *Query) Join(table, my, cond, target string) *Query {
-	q.builder.Join(table, my, cond, target)
+func (q *Query) Join(table, localColumn, cond, target string) *Query {
+	q.builder.Join(table, localColumn, cond, target)
 	return q
 }
 
 // LeftJoin adds LEFT JOIN clause.
-func (q *Query) LeftJoin(table, my, cond, target string) *Query {
-	q.builder.LeftJoin(table, my, cond, target)
+func (q *Query) LeftJoin(table, localColumn, cond, target string) *Query {
+	q.builder.LeftJoin(table, localColumn, cond, target)
 	return q
 }
 
 // RightJoin adds RIGHT JOIN clause.
-func (q *Query) RightJoin(table, my, cond, target string) *Query {
-	q.builder.RightJoin(table, my, cond, target)
+func (q *Query) RightJoin(table, localColumn, cond, target string) *Query {
+	q.builder.RightJoin(table, localColumn, cond, target)
 	return q
 }
 
