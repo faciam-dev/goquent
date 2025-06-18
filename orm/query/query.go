@@ -128,3 +128,177 @@ func (q *Query) Offset(n int) *Query {
 	q.builder.Offset(int64(n))
 	return q
 }
+
+// SelectRaw adds a raw select expression.
+func (q *Query) SelectRaw(raw string, values ...any) *Query {
+	q.builder.SelectRaw(raw, values...)
+	return q
+}
+
+// Count adds COUNT aggregate functions.
+func (q *Query) Count(cols ...string) *Query {
+	q.builder.Count(cols...)
+	return q
+}
+
+// Distinct marks columns as DISTINCT.
+func (q *Query) Distinct(cols ...string) *Query {
+	q.builder.Distinct(cols...)
+	return q
+}
+
+// Max adds MAX aggregate function.
+func (q *Query) Max(col string) *Query { q.builder.Max(col); return q }
+
+// Min adds MIN aggregate function.
+func (q *Query) Min(col string) *Query { q.builder.Min(col); return q }
+
+// Sum adds SUM aggregate function.
+func (q *Query) Sum(col string) *Query { q.builder.Sum(col); return q }
+
+// Avg adds AVG aggregate function.
+func (q *Query) Avg(col string) *Query { q.builder.Avg(col); return q }
+
+// Join adds INNER JOIN clause.
+func (q *Query) Join(table, my, cond, target string) *Query {
+	q.builder.Join(table, my, cond, target)
+	return q
+}
+
+// LeftJoin adds LEFT JOIN clause.
+func (q *Query) LeftJoin(table, my, cond, target string) *Query {
+	q.builder.LeftJoin(table, my, cond, target)
+	return q
+}
+
+// RightJoin adds RIGHT JOIN clause.
+func (q *Query) RightJoin(table, my, cond, target string) *Query {
+	q.builder.RightJoin(table, my, cond, target)
+	return q
+}
+
+// CrossJoin adds CROSS JOIN clause.
+func (q *Query) CrossJoin(table string) *Query {
+	q.builder.CrossJoin(table)
+	return q
+}
+
+// OrderBy adds ORDER BY clause.
+func (q *Query) OrderBy(col, dir string) *Query {
+	q.builder.OrderBy(col, dir)
+	return q
+}
+
+// OrderByRaw adds raw ORDER BY clause.
+func (q *Query) OrderByRaw(raw string) *Query {
+	q.builder.OrderByRaw(raw)
+	return q
+}
+
+// ReOrder clears ORDER BY clauses.
+func (q *Query) ReOrder() *Query {
+	q.builder.ReOrder()
+	return q
+}
+
+// GroupBy adds GROUP BY clause.
+func (q *Query) GroupBy(cols ...string) *Query {
+	q.builder.GroupBy(cols...)
+	return q
+}
+
+// Having adds HAVING condition.
+func (q *Query) Having(col, cond string, val any) *Query {
+	q.builder.Having(col, cond, val)
+	return q
+}
+
+// HavingRaw adds raw HAVING condition.
+func (q *Query) HavingRaw(raw string) *Query {
+	q.builder.HavingRaw(raw)
+	return q
+}
+
+// OrHaving adds OR HAVING condition.
+func (q *Query) OrHaving(col, cond string, val any) *Query {
+	q.builder.OrHaving(col, cond, val)
+	return q
+}
+
+// OrHavingRaw adds raw OR HAVING condition.
+func (q *Query) OrHavingRaw(raw string) *Query {
+	q.builder.OrHavingRaw(raw)
+	return q
+}
+
+// OrWhere appends OR condition.
+func (q *Query) OrWhere(col string, args ...any) *Query {
+	if q.err != nil {
+		return q
+	}
+	switch len(args) {
+	case 1:
+		q.builder.OrWhere(col, "=", args[0])
+	case 2:
+		op, ok := args[0].(string)
+		if !ok {
+			q.err = fmt.Errorf("invalid operator type")
+			return q
+		}
+		q.builder.OrWhere(col, op, args[1])
+	default:
+		q.err = fmt.Errorf("invalid OrWhere usage")
+	}
+	return q
+}
+
+// WhereRaw appends raw WHERE condition.
+func (q *Query) WhereRaw(raw string, vals map[string]any) *Query {
+	q.builder.WhereRaw(raw, vals)
+	return q
+}
+
+// OrWhereRaw appends raw OR WHERE condition.
+func (q *Query) OrWhereRaw(raw string, vals map[string]any) *Query {
+	q.builder.OrWhereRaw(raw, vals)
+	return q
+}
+
+// WhereIn adds WHERE IN condition.
+func (q *Query) WhereIn(col string, vals any) *Query {
+	q.builder.WhereIn(col, vals)
+	return q
+}
+
+// WhereNotIn adds WHERE NOT IN condition.
+func (q *Query) WhereNotIn(col string, vals any) *Query {
+	q.builder.WhereNotIn(col, vals)
+	return q
+}
+
+// OrWhereIn adds OR WHERE IN condition.
+func (q *Query) OrWhereIn(col string, vals any) *Query {
+	q.builder.OrWhereIn(col, vals)
+	return q
+}
+
+// OrWhereNotIn adds OR WHERE NOT IN condition.
+func (q *Query) OrWhereNotIn(col string, vals any) *Query {
+	q.builder.OrWhereNotIn(col, vals)
+	return q
+}
+
+// Take is an alias of Limit.
+func (q *Query) Take(n int) *Query { return q.Limit(n) }
+
+// Skip is an alias of Offset.
+func (q *Query) Skip(n int) *Query { return q.Offset(n) }
+
+// Build returns the SQL and args.
+func (q *Query) Build() (string, []any, error) { return q.builder.Build() }
+
+// Dump returns SQL and args for debugging.
+func (q *Query) Dump() (string, []any, error) { return q.builder.Dump() }
+
+// RawSQL returns interpolated SQL for debugging.
+func (q *Query) RawSQL() (string, error) { return q.builder.RawSql() }
