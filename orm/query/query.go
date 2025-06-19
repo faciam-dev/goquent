@@ -758,7 +758,7 @@ func deepCopyJoins(jb any) reflect.Value {
 }
 
 // setFieldValue assigns value to an exported field using reflection.
-// It does not manipulate unexported fields to ensure safety and maintainability.
+// If the target field is unexported or cannot be set, it returns an error.
 func setFieldValue(target any, field string, value reflect.Value) error {
 	v := reflect.ValueOf(target).Elem().FieldByName(field)
 	if !v.IsValid() {

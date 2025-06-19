@@ -46,8 +46,8 @@ func Columns(t reflect.Type) []fieldInfo {
 		res = append(res, fieldInfo{name: col, index: f.Index})
 	}
 	cache.Lock()
+	defer cache.Unlock()
 	cache.m[t] = res
-	cache.Unlock()
 	return res
 }
 
