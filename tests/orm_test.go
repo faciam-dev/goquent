@@ -101,6 +101,25 @@ func TestInsert(t *testing.T) {
 	}
 }
 
+func TestInsertGetId(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	id, err := db.Table("users").InsertGetId(map[string]any{"name": "frank", "age": 28})
+	if err != nil {
+		t.Fatalf("insert get id: %v", err)
+	}
+	if id != 3 {
+		t.Errorf("expected id 3, got %d", id)
+	}
+	var row map[string]any
+	if err := db.Table("users").Where("id", id).FirstMap(&row); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if row["name"] != "frank" {
+		t.Errorf("expected frank, got %v", row["name"])
+	}
+}
+
 func TestUpdate(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()

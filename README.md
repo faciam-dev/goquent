@@ -23,6 +23,12 @@ if err != nil {
 
 var rows []map[string]any
 err = orm.Table("users").Where("age", ">", 20).GetMaps(&rows)
+
+// insert a record and get its auto-increment id
+newID, err := orm.Table("users").InsertGetId(map[string]any{"name": "sam", "age": 18})
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 Transactions are handled via `Transaction`:
