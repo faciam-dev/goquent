@@ -87,3 +87,54 @@ func TestUnionAllKeepsDuplicates(t *testing.T) {
 		t.Errorf("unexpected union all result: %v", rows)
 	}
 }
+
+func TestWhereMonthDayYearTime(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	var row map[string]any
+	if err := db.Table("users").WhereMonth("created_at", "=", "12").FirstMap(&row); err != nil {
+		t.Fatalf("where month: %v", err)
+	}
+	if row["name"] != "alice" {
+		t.Errorf("expected alice, got %v", row["name"])
+	}
+
+	if err := db.Table("users").WhereDay("created_at", "=", "31").FirstMap(&row); err != nil {
+		t.Fatalf("where day: %v", err)
+	}
+	if row["name"] != "alice" {
+		t.Errorf("expected alice, got %v", row["name"])
+	}
+
+	var rows []map[string]any
+	if err := db.Table("users").WhereYear("created_at", "=", "2025").OrderBy("id", "asc").GetMaps(&rows); err != nil {
+		t.Fatalf("where year: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Errorf("expected 2 rows, got %d", len(rows))
+	}
+
+	if err := db.Table("users").WhereTime("created_at", "=", "11:22:33").FirstMap(&row); err != nil {
+		t.Fatalf("where time: %v", err)
+	}
+	if row["name"] != "alice" {
+		t.Errorf("expected alice, got %v", row["name"])
+	}
+}
+
+func TestWhereColumn(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	var rows []map[string]any
+	err := db.Table("users").Join("profiles", "users.id", "=", "profiles.user_id").
+		WhereColumn("users.id", "profiles.user_id").
+		OrderBy("users.id", "asc").GetMaps(&rows)
+	if err != nil {
+		t.Fatalf("where column: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Errorf("expected 2 rows, got %d", len(rows))
+	}
+}

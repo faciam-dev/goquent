@@ -303,6 +303,66 @@ func (q *Query) OrWhereNotIn(col string, vals any) *Query {
 	return q
 }
 
+// WhereColumn adds WHERE column operator column condition.
+func (q *Query) WhereColumn(col string, args ...string) *Query {
+	var op, other string
+	switch len(args) {
+	case 1:
+		op = "="
+		other = args[0]
+	case 2:
+		op = args[0]
+		other = args[1]
+	default:
+		q.err = fmt.Errorf("invalid WhereColumn usage")
+		return q
+	}
+	columnsPair := []string{col, other}
+	q.builder.WhereColumn(columnsPair, col, op, other)
+	return q
+}
+
+// OrWhereColumn adds OR WHERE column operator column condition.
+func (q *Query) OrWhereColumn(col string, args ...string) *Query {
+	var op, other string
+	switch len(args) {
+	case 1:
+		op = "="
+		other = args[0]
+	case 2:
+		op = args[0]
+		other = args[1]
+	default:
+		q.err = fmt.Errorf("invalid OrWhereColumn usage")
+		return q
+	}
+	columnsPair := []string{col, other}
+	q.builder.OrWhereColumn(columnsPair, col, op, other)
+	return q
+}
+
+// WhereColumns adds multiple column comparison conditions joined by AND.
+func (q *Query) WhereColumns(columns [][]string) *Query {
+	all, err := gatherColumns(columns)
+	if err != nil {
+		q.err = err
+		return q
+	}
+	q.builder.WhereColumns(all, columns)
+	return q
+}
+
+// OrWhereColumns adds multiple column comparison conditions joined by OR.
+func (q *Query) OrWhereColumns(columns [][]string) *Query {
+	all, err := gatherColumns(columns)
+	if err != nil {
+		q.err = err
+		return q
+	}
+	q.builder.OrWhereColumns(all, columns)
+	return q
+}
+
 // WhereNull adds WHERE column IS NULL condition.
 func (q *Query) WhereNull(col string) *Query {
 	q.builder.WhereNull(col)
@@ -384,6 +444,54 @@ func (q *Query) WhereDate(col, cond, date string) *Query {
 // OrWhereDate adds OR WHERE DATE(column) comparison condition.
 func (q *Query) OrWhereDate(col, cond, date string) *Query {
 	q.builder.OrWhereDate(col, cond, date)
+	return q
+}
+
+// WhereTime adds WHERE TIME(column) comparison condition.
+func (q *Query) WhereTime(col, cond, time string) *Query {
+	q.builder.WhereTime(col, cond, time)
+	return q
+}
+
+// OrWhereTime adds OR WHERE TIME(column) comparison condition.
+func (q *Query) OrWhereTime(col, cond, time string) *Query {
+	q.builder.OrWhereTime(col, cond, time)
+	return q
+}
+
+// WhereDay adds WHERE DAY(column) comparison condition.
+func (q *Query) WhereDay(col, cond, day string) *Query {
+	q.builder.WhereDay(col, cond, day)
+	return q
+}
+
+// OrWhereDay adds OR WHERE DAY(column) comparison condition.
+func (q *Query) OrWhereDay(col, cond, day string) *Query {
+	q.builder.OrWhereDay(col, cond, day)
+	return q
+}
+
+// WhereMonth adds WHERE MONTH(column) comparison condition.
+func (q *Query) WhereMonth(col, cond, month string) *Query {
+	q.builder.WhereMonth(col, cond, month)
+	return q
+}
+
+// OrWhereMonth adds OR WHERE MONTH(column) comparison condition.
+func (q *Query) OrWhereMonth(col, cond, month string) *Query {
+	q.builder.OrWhereMonth(col, cond, month)
+	return q
+}
+
+// WhereYear adds WHERE YEAR(column) comparison condition.
+func (q *Query) WhereYear(col, cond, year string) *Query {
+	q.builder.WhereYear(col, cond, year)
+	return q
+}
+
+// OrWhereYear adds OR WHERE YEAR(column) comparison condition.
+func (q *Query) OrWhereYear(col, cond, year string) *Query {
+	q.builder.OrWhereYear(col, cond, year)
 	return q
 }
 
@@ -558,4 +666,28 @@ func setFieldValue(target any, field string, value reflect.Value) error {
 	p := unsafe.Pointer(v.UnsafeAddr())
 	reflect.NewAt(v.Type(), p).Elem().Set(value)
 	return nil
+}
+
+// gatherColumns extracts unique column names from column comparison slices.
+// Each slice must have length 2 (column, otherColumn) or 3 (column, operator, otherColumn).
+// Returns an error if any slice has an unexpected length.
+func gatherColumns(cols [][]string) ([]string, error) {
+	set := make(map[string]struct{})
+	for i, c := range cols {
+		switch len(c) {
+		case 2:
+			set[c[0]] = struct{}{}
+			set[c[1]] = struct{}{}
+		case 3:
+			set[c[0]] = struct{}{}
+			set[c[2]] = struct{}{}
+		default:
+			return nil, fmt.Errorf("invalid column slice at index %d", i)
+		}
+	}
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	return out, nil
 }
