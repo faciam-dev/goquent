@@ -25,7 +25,12 @@ func setupDB(t testing.TB) *orm.DB {
 		t.Fatalf("open: %v", err)
 	}
 	stdDB, _ := sql.Open("mysql", dsn)
-	_, err = stdDB.Exec(`CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(64), age INT)`)
+	_, err = stdDB.Exec(`CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(64),
+            age INT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`)
 	if err != nil {
 		t.Fatalf("create table: %v", err)
 	}
@@ -41,7 +46,9 @@ func setupDB(t testing.TB) *orm.DB {
 	if err != nil {
 		t.Fatalf("truncate profiles: %v", err)
 	}
-	_, err = stdDB.Exec("INSERT INTO users(name, age) VALUES ('alice', 30), ('bob', 25)")
+	_, err = stdDB.Exec("INSERT INTO users(name, age, created_at) VALUES " +
+		"('alice', 30, '2025-12-31 11:22:33')," +
+		"('bob', 25, '2025-11-20 10:10:10')")
 	if err != nil {
 		t.Fatalf("insert users: %v", err)
 	}
