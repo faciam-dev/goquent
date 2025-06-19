@@ -38,9 +38,38 @@ err := orm.Transaction(func(tx orm.Tx) error {
 })
 ```
 
+## Project Structure
+The repository follows the Onion Architecture:
+
+```
+./cmd/        - Entry points
+./internal/   - Application code
+  ├── domain        - Business logic
+  ├── usecase       - Application workflows
+  ├── infrastructure - External implementations
+  └── interface     - HTTP handlers or adapters
+```
+
+The `orm` directory contains the lightweight ORM used by the project.
+
+## Development
+1. Start MySQL 8 using Docker Compose:
+   ```bash
+   docker-compose up -d
+   ```
+2. Run tests:
+   ```bash
+   go test ./...
+   ```
+The tests automatically create the required tables.
+
+
 ## Benchmarks
 Run benchmarks with `go test -bench . ./tests`.
 Results on a GitHub Codespace (Go 1.23) show ~1.5x speedup over GORM for scanning operations.
 
 ## Extending to PostgreSQL
 The driver package is designed with dialect abstractions. Implementing a `postgresDialect` and adding support in `driver.Open` would enable PostgreSQL usage.
+
+## License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
