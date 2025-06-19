@@ -176,6 +176,36 @@ func TestUpsert(t *testing.T) {
 	}
 }
 
+func TestUpdateOrInsert(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	// update existing row
+	_, err := db.Table("users").UpdateOrInsert(map[string]any{"id": 1}, map[string]any{"age": 45})
+	if err != nil {
+		t.Fatalf("update or insert (update): %v", err)
+	}
+	var row map[string]any
+	if err := db.Table("users").Where("id", 1).FirstMap(&row); err != nil {
+		t.Fatalf("select updated: %v", err)
+	}
+	if row["age"] != int64(45) {
+		t.Errorf("expected age 45, got %v", row["age"])
+	}
+
+	// insert new row
+	_, err = db.Table("users").UpdateOrInsert(map[string]any{"id": 3}, map[string]any{"name": "carol", "age": 32})
+	if err != nil {
+		t.Fatalf("update or insert (insert): %v", err)
+	}
+	if err := db.Table("users").Where("id", 3).FirstMap(&row); err != nil {
+		t.Fatalf("select inserted: %v", err)
+	}
+	if row["name"] != "carol" {
+		t.Errorf("expected name carol, got %v", row["name"])
+	}
+}
+
 func TestWhereAnyAllSQL(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
