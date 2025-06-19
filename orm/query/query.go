@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
-	"unsafe"
 
 	qbapi "github.com/faciam-dev/goquent-query-builder/api"
 	qbmysql "github.com/faciam-dev/goquent-query-builder/database/mysql"
@@ -768,12 +767,10 @@ func setFieldValue(target any, field string, value reflect.Value) error {
 	if v.Type() != value.Type() {
 		return fmt.Errorf("type mismatch for field %q", field)
 	}
-	if v.CanSet() {
-		v.Set(value)
-		return nil
+	if !v.CanSet() {
+		return fmt.Errorf("cannot set field %q", field)
 	}
-	p := unsafe.Pointer(v.UnsafeAddr())
-	reflect.NewAt(v.Type(), p).Elem().Set(value)
+	v.Set(value)
 	return nil
 }
 

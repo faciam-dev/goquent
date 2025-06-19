@@ -2,6 +2,7 @@ package driver
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -18,7 +19,10 @@ type MySQLDialect struct{}
 
 func (d MySQLDialect) Placeholder(_ int) string { return "?" }
 
-func (d MySQLDialect) QuoteIdent(ident string) string { return "`" + ident + "`" }
+func (d MySQLDialect) QuoteIdent(ident string) string {
+	escaped := strings.ReplaceAll(ident, "`", "``")
+	return "`" + escaped + "`"
+}
 
 // Driver wraps sql.DB with a dialect.
 type Driver struct {

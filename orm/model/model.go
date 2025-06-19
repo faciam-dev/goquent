@@ -3,6 +3,7 @@ package model
 import (
 	"reflect"
 	"strings"
+	"sync"
 )
 
 // fieldInfo holds mapping metadata.
@@ -11,12 +12,18 @@ type fieldInfo struct {
 	index []int
 }
 
-// Map of struct type -> column mappings.
-var cache = map[reflect.Type][]fieldInfo{}
+// Map of struct type -> column mappings with concurrency safety.
+var cache = struct {
+	sync.RWMutex
+	m map[reflect.Type][]fieldInfo
+}{m: make(map[reflect.Type][]fieldInfo)}
 
 // Columns returns column info for struct type.
 func Columns(t reflect.Type) []fieldInfo {
-	if fi, ok := cache[t]; ok {
+	cache.RLock()
+	fi, ok := cache.m[t]
+	cache.RUnlock()
+	if ok {
 		return fi
 	}
 	var res []fieldInfo
@@ -38,7 +45,9 @@ func Columns(t reflect.Type) []fieldInfo {
 		}
 		res = append(res, fieldInfo{name: col, index: f.Index})
 	}
-	cache[t] = res
+	cache.Lock()
+	cache.m[t] = res
+	cache.Unlock()
 	return res
 }
 
