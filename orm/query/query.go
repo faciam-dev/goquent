@@ -297,6 +297,18 @@ func (q *Query) Take(n int) *Query { return q.Limit(n) }
 // Skip is an alias of Offset.
 func (q *Query) Skip(n int) *Query { return q.Offset(n) }
 
+// SharedLock adds LOCK IN SHARE MODE clause.
+func (q *Query) SharedLock() *Query {
+	q.builder.SharedLock()
+	return q
+}
+
+// LockForUpdate adds FOR UPDATE clause.
+func (q *Query) LockForUpdate() *Query {
+	q.builder.LockForUpdate()
+	return q
+}
+
 // Build returns the SQL and args.
 func (q *Query) Build() (string, []any, error) { return q.builder.Build() }
 
