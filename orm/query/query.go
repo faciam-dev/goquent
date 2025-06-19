@@ -317,8 +317,8 @@ func (q *Query) WhereColumn(col string, args ...string) *Query {
 		q.err = fmt.Errorf("invalid WhereColumn usage")
 		return q
 	}
-	all := []string{col, other}
-	q.builder.WhereColumn(all, col, op, other)
+	columnsPair := []string{col, other}
+	q.builder.WhereColumn(columnsPair, col, op, other)
 	return q
 }
 
@@ -336,21 +336,29 @@ func (q *Query) OrWhereColumn(col string, args ...string) *Query {
 		q.err = fmt.Errorf("invalid OrWhereColumn usage")
 		return q
 	}
-	all := []string{col, other}
-	q.builder.OrWhereColumn(all, col, op, other)
+	columnsPair := []string{col, other}
+	q.builder.OrWhereColumn(columnsPair, col, op, other)
 	return q
 }
 
 // WhereColumns adds multiple column comparison conditions joined by AND.
 func (q *Query) WhereColumns(columns [][]string) *Query {
-	all := gatherColumns(columns)
+	all, err := gatherColumns(columns)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.WhereColumns(all, columns)
 	return q
 }
 
 // OrWhereColumns adds multiple column comparison conditions joined by OR.
 func (q *Query) OrWhereColumns(columns [][]string) *Query {
-	all := gatherColumns(columns)
+	all, err := gatherColumns(columns)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.OrWhereColumns(all, columns)
 	return q
 }
@@ -660,20 +668,26 @@ func setFieldValue(target any, field string, value reflect.Value) error {
 	return nil
 }
 
-func gatherColumns(cols [][]string) []string {
+// gatherColumns extracts unique column names from column comparison slices.
+// Each slice must have length 2 (column, otherColumn) or 3 (column, operator, otherColumn).
+// Returns an error if any slice has an unexpected length.
+func gatherColumns(cols [][]string) ([]string, error) {
 	set := make(map[string]struct{})
-	for _, c := range cols {
-		if len(c) == 2 {
+	for i, c := range cols {
+		switch len(c) {
+		case 2:
 			set[c[0]] = struct{}{}
 			set[c[1]] = struct{}{}
-		} else if len(c) == 3 {
+		case 3:
 			set[c[0]] = struct{}{}
 			set[c[2]] = struct{}{}
+		default:
+			return nil, fmt.Errorf("invalid column slice at index %d", i)
 		}
 	}
 	out := make([]string, 0, len(set))
 	for k := range set {
 		out = append(out, k)
 	}
-	return out
+	return out, nil
 }
