@@ -16,7 +16,7 @@ Thank you for considering a contribution to this project.
 
 ## Coding Style
 
-- Follow the directory structure and dependency rules described in `AGENT.MD`.
+- Follow the directory structure and dependency rules described in [AGENT.MD](AGENT.MD).
 - Keep comments and documentation in English.
 - Use `gofmt` before committing changes.
 

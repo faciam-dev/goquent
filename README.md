@@ -46,7 +46,7 @@ The repository follows the Onion Architecture:
 ./internal/   - Application code
   ├── domain        - Business logic
   ├── usecase       - Application workflows
-  ├── infrastructure- External implementations
+  ├── infrastructure - External implementations
   └── interface     - HTTP handlers or adapters
 ```
 
