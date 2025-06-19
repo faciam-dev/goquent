@@ -303,6 +303,42 @@ func (q *Query) OrWhereNotIn(col string, vals any) *Query {
 	return q
 }
 
+// WhereInSubQuery adds WHERE IN (subquery) condition.
+func (q *Query) WhereInSubQuery(col string, sub *Query) *Query {
+	q.builder.WhereInSubQuery(col, sub.builder)
+	return q
+}
+
+// WhereNotInSubQuery adds WHERE NOT IN (subquery) condition.
+func (q *Query) WhereNotInSubQuery(col string, sub *Query) *Query {
+	q.builder.WhereNotInSubQuery(col, sub.builder)
+	return q
+}
+
+// OrWhereInSubQuery adds OR WHERE IN (subquery) condition.
+func (q *Query) OrWhereInSubQuery(col string, sub *Query) *Query {
+	q.builder.OrWhereInSubQuery(col, sub.builder)
+	return q
+}
+
+// OrWhereNotInSubQuery adds OR WHERE NOT IN (subquery) condition.
+func (q *Query) OrWhereNotInSubQuery(col string, sub *Query) *Query {
+	q.builder.OrWhereNotInSubQuery(col, sub.builder)
+	return q
+}
+
+// WhereAny adds grouped OR conditions across columns.
+func (q *Query) WhereAny(cols []string, cond string, val any) *Query {
+	q.builder.WhereAny(cols, cond, val)
+	return q
+}
+
+// WhereAll adds grouped AND conditions across columns.
+func (q *Query) WhereAll(cols []string, cond string, val any) *Query {
+	q.builder.WhereAll(cols, cond, val)
+	return q
+}
+
 // WhereColumn adds WHERE column operator column condition.
 func (q *Query) WhereColumn(col string, args ...string) *Query {
 	var op, other string
@@ -408,6 +444,46 @@ func (q *Query) OrWhereBetween(col string, min, max any) *Query {
 // OrWhereNotBetween adds OR WHERE NOT BETWEEN condition.
 func (q *Query) OrWhereNotBetween(col string, min, max any) *Query {
 	q.builder.OrWhereNotBetween(col, min, max)
+	return q
+}
+
+// WhereBetweenColumns adds WHERE col BETWEEN minCol AND maxCol using columns.
+func (q *Query) WhereBetweenColumns(col, minCol, maxCol string) *Query {
+	cols := []string{col, minCol, maxCol}
+	q.builder.WhereBetweenColumns(cols, col, minCol, maxCol)
+	return q
+}
+
+// OrWhereBetweenColumns adds OR WHERE col BETWEEN minCol AND maxCol using columns.
+func (q *Query) OrWhereBetweenColumns(col, minCol, maxCol string) *Query {
+	cols := []string{col, minCol, maxCol}
+	q.builder.OrWhereBetweenColumns(cols, col, minCol, maxCol)
+	return q
+}
+
+// WhereNotBetweenColumns adds WHERE col NOT BETWEEN minCol AND maxCol using columns.
+func (q *Query) WhereNotBetweenColumns(col, minCol, maxCol string) *Query {
+	cols := []string{col, minCol, maxCol}
+	q.builder.WhereNotBetweenColumns(cols, col, minCol, maxCol)
+	return q
+}
+
+// OrWhereNotBetweenColumns adds OR WHERE col NOT BETWEEN minCol AND maxCol using columns.
+func (q *Query) OrWhereNotBetweenColumns(col, minCol, maxCol string) *Query {
+	cols := []string{col, minCol, maxCol}
+	q.builder.OrWhereNotBetweenColumns(cols, col, minCol, maxCol)
+	return q
+}
+
+// WhereFullText adds full-text search condition.
+func (q *Query) WhereFullText(cols []string, search string, opts map[string]any) *Query {
+	q.builder.WhereFullText(cols, search, opts)
+	return q
+}
+
+// OrWhereFullText adds OR full-text search condition.
+func (q *Query) OrWhereFullText(cols []string, search string, opts map[string]any) *Query {
+	q.builder.OrWhereFullText(cols, search, opts)
 	return q
 }
 
@@ -550,6 +626,39 @@ func (q *Query) InsertGetId(data map[string]any) (int64, error) {
 func (q *Query) InsertBatch(data []map[string]any) (sql.Result, error) {
 	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
 	ib.Table(q.builder.GetQuery().Table.Name).InsertBatch(data)
+	sqlStr, args, err := ib.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.exec.Exec(sqlStr, args...)
+}
+
+// InsertOrIgnore executes an INSERT IGNORE.
+func (q *Query) InsertOrIgnore(data []map[string]any) (sql.Result, error) {
+	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib.Table(q.builder.GetQuery().Table.Name).InsertOrIgnore(data)
+	sqlStr, args, err := ib.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.exec.Exec(sqlStr, args...)
+}
+
+// Upsert executes an UPSERT using ON DUPLICATE KEY UPDATE.
+func (q *Query) Upsert(data []map[string]any, unique []string, updateCols []string) (sql.Result, error) {
+	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib.Table(q.builder.GetQuery().Table.Name).Upsert(data, unique, updateCols)
+	sqlStr, args, err := ib.Build()
+	if err != nil {
+		return nil, err
+	}
+	return q.exec.Exec(sqlStr, args...)
+}
+
+// UpdateOrInsert performs UPDATE or INSERT based on condition.
+func (q *Query) UpdateOrInsert(cond map[string]any, values map[string]any) (sql.Result, error) {
+	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib.Table(q.builder.GetQuery().Table.Name).UpdateOrInsert(cond, values)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
 		return nil, err
