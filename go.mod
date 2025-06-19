@@ -3,7 +3,7 @@ module goquent
 go 1.23.8
 
 require (
-	github.com/faciam-dev/goquent-query-builder v0.0.0-20250604114500-97cfa3484b62
+	github.com/faciam-dev/goquent-query-builder v0.0.0-20250619084017-474845efa373
 	github.com/go-sql-driver/mysql v1.9.3
 )
 

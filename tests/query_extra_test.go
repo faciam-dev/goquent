@@ -1,6 +1,9 @@
 package tests
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestWhereNullAndNotNull(t *testing.T) {
 	db := setupDB(t)
@@ -136,5 +139,60 @@ func TestWhereColumn(t *testing.T) {
 	}
 	if len(rows) != 2 {
 		t.Errorf("expected 2 rows, got %d", len(rows))
+	}
+}
+
+func TestInsertOrIgnore(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	_, err := db.Table("users").InsertOrIgnore([]map[string]any{{"id": 1, "name": "dup", "age": 99}})
+	if err != nil {
+		t.Fatalf("insert or ignore: %v", err)
+	}
+	var rows []map[string]any
+	if err := db.Table("users").Where("id", 1).GetMaps(&rows); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Errorf("expected 1 row, got %d", len(rows))
+	}
+}
+
+func TestUpsert(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	_, err := db.Table("users").Upsert([]map[string]any{{"id": 1, "name": "alice", "age": 50}}, []string{"id"}, []string{"age"})
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	var row map[string]any
+	if err := db.Table("users").Where("id", 1).FirstMap(&row); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if row["age"] != int64(50) {
+		t.Errorf("expected age 50, got %v", row["age"])
+	}
+}
+
+func TestWhereAnyAllSQL(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	sqlStr, err := db.Table("users").WhereAny([]string{"name", "age"}, "LIKE", "%a%").RawSQL()
+	if err != nil {
+		t.Fatalf("raw sql any: %v", err)
+	}
+	if !strings.Contains(sqlStr, "OR") {
+		t.Errorf("expected OR in sql, got %s", sqlStr)
+	}
+
+	sqlStr, err = db.Table("users").WhereAll([]string{"name", "age"}, "LIKE", "%a%").RawSQL()
+	if err != nil {
+		t.Fatalf("raw sql all: %v", err)
+	}
+	if !strings.Contains(sqlStr, "AND") {
+		t.Errorf("expected AND in sql, got %s", sqlStr)
 	}
 }
