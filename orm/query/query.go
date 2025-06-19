@@ -317,6 +317,19 @@ func (q *Query) Insert(data map[string]any) (sql.Result, error) {
 	return q.exec.Exec(sqlStr, args...)
 }
 
+// InsertGetId executes an INSERT and returns the auto-increment ID.
+func (q *Query) InsertGetId(data map[string]any) (int64, error) {
+	res, err := q.Insert(data)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
 // InsertBatch executes a bulk INSERT with the given slice of data maps.
 func (q *Query) InsertBatch(data []map[string]any) (sql.Result, error) {
 	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
