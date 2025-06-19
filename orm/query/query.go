@@ -150,6 +150,18 @@ func (q *Query) Distinct(cols ...string) *Query {
 	return q
 }
 
+// Union adds a UNION with another query.
+func (q *Query) Union(sub *Query) *Query {
+	q.builder.Union(sub.builder)
+	return q
+}
+
+// UnionAll adds a UNION ALL with another query.
+func (q *Query) UnionAll(sub *Query) *Query {
+	q.builder.UnionAll(sub.builder)
+	return q
+}
+
 // Max adds MAX aggregate function.
 func (q *Query) Max(col string) *Query { q.builder.Max(col); return q }
 
@@ -288,6 +300,90 @@ func (q *Query) OrWhereIn(col string, vals any) *Query {
 // OrWhereNotIn adds OR WHERE NOT IN condition.
 func (q *Query) OrWhereNotIn(col string, vals any) *Query {
 	q.builder.OrWhereNotIn(col, vals)
+	return q
+}
+
+// WhereNull adds WHERE column IS NULL condition.
+func (q *Query) WhereNull(col string) *Query {
+	q.builder.WhereNull(col)
+	return q
+}
+
+// WhereNotNull adds WHERE column IS NOT NULL condition.
+func (q *Query) WhereNotNull(col string) *Query {
+	q.builder.WhereNotNull(col)
+	return q
+}
+
+// OrWhereNull adds OR WHERE column IS NULL condition.
+func (q *Query) OrWhereNull(col string) *Query {
+	q.builder.OrWhereNull(col)
+	return q
+}
+
+// OrWhereNotNull adds OR WHERE column IS NOT NULL condition.
+func (q *Query) OrWhereNotNull(col string) *Query {
+	q.builder.OrWhereNotNull(col)
+	return q
+}
+
+// WhereBetween adds WHERE BETWEEN condition.
+func (q *Query) WhereBetween(col string, min, max any) *Query {
+	q.builder.WhereBetween(col, min, max)
+	return q
+}
+
+// WhereNotBetween adds WHERE NOT BETWEEN condition.
+func (q *Query) WhereNotBetween(col string, min, max any) *Query {
+	q.builder.WhereNotBetween(col, min, max)
+	return q
+}
+
+// OrWhereBetween adds OR WHERE BETWEEN condition.
+func (q *Query) OrWhereBetween(col string, min, max any) *Query {
+	q.builder.OrWhereBetween(col, min, max)
+	return q
+}
+
+// OrWhereNotBetween adds OR WHERE NOT BETWEEN condition.
+func (q *Query) OrWhereNotBetween(col string, min, max any) *Query {
+	q.builder.OrWhereNotBetween(col, min, max)
+	return q
+}
+
+// WhereExists adds WHERE EXISTS (subquery) condition.
+func (q *Query) WhereExists(sub *Query) *Query {
+	q.builder.WhereExistsSubQuery(sub.builder)
+	return q
+}
+
+// OrWhereExists adds OR WHERE EXISTS (subquery) condition.
+func (q *Query) OrWhereExists(sub *Query) *Query {
+	q.builder.OrWhereExistsSubQuery(sub.builder)
+	return q
+}
+
+// WhereNotExists adds WHERE NOT EXISTS (subquery) condition.
+func (q *Query) WhereNotExists(sub *Query) *Query {
+	q.builder.WhereNotExistsQuery(sub.builder)
+	return q
+}
+
+// OrWhereNotExists adds OR WHERE NOT EXISTS (subquery) condition.
+func (q *Query) OrWhereNotExists(sub *Query) *Query {
+	q.builder.OrWhereNotExistsQuery(sub.builder)
+	return q
+}
+
+// WhereDate adds WHERE DATE(column) comparison condition.
+func (q *Query) WhereDate(col, cond, date string) *Query {
+	q.builder.WhereDate(col, cond, date)
+	return q
+}
+
+// OrWhereDate adds OR WHERE DATE(column) comparison condition.
+func (q *Query) OrWhereDate(col, cond, date string) *Query {
+	q.builder.OrWhereDate(col, cond, date)
 	return q
 }
 
