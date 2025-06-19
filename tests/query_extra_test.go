@@ -22,8 +22,8 @@ func TestWhereNullAndNotNull(t *testing.T) {
 	if err := db.Table("users").WhereNotNull("age").OrderBy("id", "asc").GetMaps(&rows); err != nil {
 		t.Fatalf("where not null: %v", err)
 	}
-	if len(rows) < 2 {
-		t.Errorf("expected at least 2 rows, got %d", len(rows))
+	if len(rows) != 2 {
+		t.Errorf("expected 2 rows, got %d", len(rows))
 	}
 }
 
@@ -55,16 +55,35 @@ func TestWhereExists(t *testing.T) {
 	}
 }
 
-func TestUnion(t *testing.T) {
+func TestUnionDistinct(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
-	q1 := db.Table("users").Select("name").Where("name", "alice")
-	q2 := db.Table("users").Select("name").Where("name", "bob")
+
+	// union identical queries should return distinct rows
+	q1 := db.Table("users").Select("name")
+	q2 := db.Table("users").Select("name")
+
 	var rows []map[string]any
 	if err := q1.Union(q2).OrderBy("name", "asc").GetMaps(&rows); err != nil {
-		t.Fatalf("union: %v", err)
+		t.Fatalf("union distinct: %v", err)
 	}
 	if len(rows) != 2 || rows[0]["name"] != "alice" || rows[1]["name"] != "bob" {
 		t.Errorf("unexpected union result: %v", rows)
+	}
+}
+
+func TestUnionAllKeepsDuplicates(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	q1 := db.Table("users").Select("name")
+	q2 := db.Table("users").Select("name")
+
+	var rows []map[string]any
+	if err := q1.UnionAll(q2).OrderBy("name", "asc").GetMaps(&rows); err != nil {
+		t.Fatalf("union all: %v", err)
+	}
+	if len(rows) != 4 || rows[0]["name"] != "alice" || rows[1]["name"] != "alice" || rows[2]["name"] != "bob" || rows[3]["name"] != "bob" {
+		t.Errorf("unexpected union all result: %v", rows)
 	}
 }
