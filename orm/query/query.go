@@ -32,6 +32,7 @@ type executor interface {
 type Query struct {
 	builder *qbapi.SelectQueryBuilder
 	exec    executor
+	ctx     context.Context
 	err     error
 }
 
@@ -40,6 +41,28 @@ func New(exec executor, table string) *Query {
 	builder := qbapi.NewSelectQueryBuilder(qbmysql.NewMySQLQueryBuilder())
 	builder.Table(table)
 	return &Query{builder: builder, exec: exec}
+}
+
+// WithContext sets ctx on the query for context-aware execution.
+func (q *Query) WithContext(ctx context.Context) *Query {
+	q.ctx = ctx
+	return q
+}
+
+// queryRows executes Query or QueryContext based on whether ctx is set.
+func (q *Query) queryRows(sqlStr string, args ...any) (*sql.Rows, error) {
+	if q.ctx != nil {
+		return q.exec.QueryContext(q.ctx, sqlStr, args...)
+	}
+	return q.exec.Query(sqlStr, args...)
+}
+
+// execStmt executes Exec or ExecContext depending on ctx.
+func (q *Query) execStmt(sqlStr string, args ...any) (sql.Result, error) {
+	if q.ctx != nil {
+		return q.exec.ExecContext(q.ctx, sqlStr, args...)
+	}
+	return q.exec.Exec(sqlStr, args...)
 }
 
 // Select sets selected columns.
@@ -78,7 +101,7 @@ func (q *Query) First(dest any) error {
 	if err != nil {
 		return err
 	}
-	rows, err := q.exec.Query(sqlStr, args...)
+	rows, err := q.queryRows(sqlStr, args...)
 	if err != nil {
 		return err
 	}
@@ -95,7 +118,7 @@ func (q *Query) FirstMap(dest *map[string]any) error {
 	if err != nil {
 		return err
 	}
-	rows, err := q.exec.Query(sqlStr, args...)
+	rows, err := q.queryRows(sqlStr, args...)
 	if err != nil {
 		return err
 	}
@@ -117,7 +140,7 @@ func (q *Query) GetMaps(dest *[]map[string]any) error {
 	if err != nil {
 		return err
 	}
-	rows, err := q.exec.Query(sqlStr, args...)
+	rows, err := q.queryRows(sqlStr, args...)
 	if err != nil {
 		return err
 	}
@@ -616,7 +639,7 @@ func (q *Query) Insert(data map[string]any) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return q.exec.Exec(sqlStr, args...)
+	return q.execStmt(sqlStr, args...)
 }
 
 // InsertGetId executes an INSERT and returns the auto-increment ID.
@@ -640,7 +663,7 @@ func (q *Query) InsertBatch(data []map[string]any) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return q.exec.Exec(sqlStr, args...)
+	return q.execStmt(sqlStr, args...)
 }
 
 // InsertOrIgnore executes an INSERT IGNORE.
@@ -651,7 +674,7 @@ func (q *Query) InsertOrIgnore(data []map[string]any) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return q.exec.Exec(sqlStr, args...)
+	return q.execStmt(sqlStr, args...)
 }
 
 // Upsert executes an UPSERT using ON DUPLICATE KEY UPDATE.
@@ -662,7 +685,7 @@ func (q *Query) Upsert(data []map[string]any, unique []string, updateCols []stri
 	if err != nil {
 		return nil, err
 	}
-	return q.exec.Exec(sqlStr, args...)
+	return q.execStmt(sqlStr, args...)
 }
 
 // UpdateOrInsert performs UPDATE or INSERT based on condition.
@@ -673,7 +696,7 @@ func (q *Query) UpdateOrInsert(cond map[string]any, values map[string]any) (sql.
 	if err != nil {
 		return nil, err
 	}
-	return q.exec.Exec(sqlStr, args...)
+	return q.execStmt(sqlStr, args...)
 }
 
 // InsertUsing executes an INSERT INTO ... SELECT statement using columns from a subquery.
@@ -684,7 +707,7 @@ func (q *Query) InsertUsing(columns []string, sub *Query) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return q.exec.Exec(sqlStr, args...)
+	return q.execStmt(sqlStr, args...)
 }
 
 // Update executes an UPDATE with the given data.
@@ -696,7 +719,7 @@ func (q *Query) Update(data map[string]any) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return q.exec.Exec(sqlStr, args...)
+	return q.execStmt(sqlStr, args...)
 }
 
 // Delete executes a DELETE query using current conditions.
@@ -708,7 +731,7 @@ func (q *Query) Delete() (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return q.exec.Exec(sqlStr, args...)
+	return q.execStmt(sqlStr, args...)
 }
 
 // copyBuilderState duplicates where, join and order clauses from src to dst.
