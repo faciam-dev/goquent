@@ -12,11 +12,17 @@ import (
 
 // executor abstracts sql.DB and sql.Tx.
 type executor interface {
+	// Query runs a SQL statement returning multiple rows.
 	Query(query string, args ...any) (*sql.Rows, error)
+	// QueryContext is the context-aware version of Query.
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	// QueryRow executes a query expected to return at most one row.
 	QueryRow(query string, args ...any) *sql.Row
+	// QueryRowContext executes a single-row query with context.
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	// Exec runs a SQL statement that doesn't return rows.
 	Exec(query string, args ...any) (sql.Result, error)
+	// ExecContext runs Exec with a context.
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
@@ -57,6 +63,16 @@ func (db *DB) Model(v any) *query.Query {
 // Table creates a query for table name.
 func (db *DB) Table(name string) *query.Query {
 	return query.New(db.exec, name)
+}
+
+// Query runs a raw SQL query returning multiple rows.
+func (db *DB) Query(q string, args ...any) (*sql.Rows, error) {
+	return db.exec.Query(q, args...)
+}
+
+// QueryContext runs Query with a context.
+func (db *DB) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
+	return db.exec.QueryContext(ctx, q, args...)
 }
 
 // Exec executes a raw SQL statement.
