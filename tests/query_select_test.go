@@ -63,3 +63,26 @@ func TestJoinSelect(t *testing.T) {
 		t.Errorf("unexpected row: %v", row)
 	}
 }
+func TestLeftJoinSelectRaw(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	var rows []map[string]any
+	err := db.Table("users").
+		LeftJoin("profiles", "users.id", "=", "profiles.user_id").
+		SelectRaw("DISTINCT profiles.id AS pid, profiles.bio AS pbio, users.id AS uid, users.name AS uname").
+		OrderBy("pid", "asc").
+		GetMaps(&rows)
+	if err != nil {
+		t.Fatalf("left join select raw: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(rows))
+	}
+	if rows[0]["pbio"] != "go developer" || rows[1]["pbio"] != "python developer" {
+		t.Errorf("unexpected pbio: %v", rows)
+	}
+	if rows[0]["uname"] != "alice" || rows[1]["uname"] != "bob" {
+		t.Errorf("unexpected uname: %v", rows)
+	}
+}
