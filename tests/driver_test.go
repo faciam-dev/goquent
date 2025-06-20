@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"goquent/orm/driver"
+	"github.com/faciam-dev/goquent/orm/driver"
 )
 
 func TestQuoteIdentEscapesBackticks(t *testing.T) {

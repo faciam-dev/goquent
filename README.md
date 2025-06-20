@@ -5,7 +5,7 @@ It currently supports MySQL only.
 
 ## Usage
 ```go
-import "goquent/orm/conv"
+import "github.com/faciam-dev/goquent/orm/conv"
 import "log"
 
 orm, _ := orm.Open("root:password@tcp(localhost:3306)/testdb?parseTime=true")

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"goquent/orm"
+	"github.com/faciam-dev/goquent/orm"
 )
 
 func TestTransactionCommit(t *testing.T) {

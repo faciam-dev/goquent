@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"time"
 
-	"goquent/orm/driver"
-	"goquent/orm/model"
-	"goquent/orm/query"
+	"github.com/faciam-dev/goquent/orm/driver"
+	"github.com/faciam-dev/goquent/orm/model"
+	"github.com/faciam-dev/goquent/orm/query"
 )
 
 // executor abstracts sql.DB and sql.Tx.

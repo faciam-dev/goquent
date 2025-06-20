@@ -7,7 +7,7 @@ import (
 
 	qbapi "github.com/faciam-dev/goquent-query-builder/api"
 	qbmysql "github.com/faciam-dev/goquent-query-builder/database/mysql"
-	"goquent/orm/scanner"
+	"github.com/faciam-dev/goquent/orm/scanner"
 )
 
 // Query wraps goquent QueryBuilder and the Driver.
