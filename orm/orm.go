@@ -32,6 +32,14 @@ type DB struct {
 	exec executor
 }
 
+// SQLDB returns the underlying *sql.DB.
+func (db *DB) SQLDB() *sql.DB {
+	if db.drv == nil {
+		return nil
+	}
+	return db.drv.DB
+}
+
 // Open opens a MySQL database with default pooling.
 func Open(dsn string) (*DB, error) {
 	drv, err := driver.Open(dsn, 10, 10, time.Hour)
