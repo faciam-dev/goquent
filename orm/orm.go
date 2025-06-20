@@ -1,6 +1,7 @@
 package orm
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -12,7 +13,11 @@ import (
 // executor abstracts sql.DB and sql.Tx.
 type executor interface {
 	Query(query string, args ...any) (*sql.Rows, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 	Exec(query string, args ...any) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
 // DB provides main ORM interface.
@@ -52,4 +57,24 @@ func (db *DB) Model(v any) *query.Query {
 // Table creates a query for table name.
 func (db *DB) Table(name string) *query.Query {
 	return query.New(db.exec, name)
+}
+
+// Exec executes a raw SQL statement.
+func (db *DB) Exec(query string, args ...any) (sql.Result, error) {
+	return db.exec.Exec(query, args...)
+}
+
+// ExecContext executes a raw SQL statement with a context.
+func (db *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return db.exec.ExecContext(ctx, query, args...)
+}
+
+// QueryRow executes a query that is expected to return at most one row.
+func (db *DB) QueryRow(query string, args ...any) *sql.Row {
+	return db.exec.QueryRow(query, args...)
+}
+
+// QueryRowContext executes a query with context returning at most one row.
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return db.exec.QueryRowContext(ctx, query, args...)
 }
