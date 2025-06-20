@@ -37,7 +37,7 @@ func Struct(dest any, rows *sql.Rows) error {
 				if fv.Type().ConvertibleTo(f.Type()) {
 					f.Set(fv.Convert(f.Type()))
 				} else {
-					return fmt.Errorf("type mismatch for %s", col)
+					return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
 				}
 			}
 		}
@@ -126,7 +126,7 @@ func Structs(dest any, rows *sql.Rows) error {
 					if fv.Type().ConvertibleTo(f.Type()) {
 						f.Set(fv.Convert(f.Type()))
 					} else {
-						return fmt.Errorf("type mismatch for %s", col)
+						return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
 					}
 				}
 			}
