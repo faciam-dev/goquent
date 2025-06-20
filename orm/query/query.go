@@ -230,6 +230,54 @@ func (q *Query) Join(table, localColumn, cond, target string) *Query {
 	return q
 }
 
+// JoinQuery adds a JOIN with additional ON/WHERE clauses defined in the callback.
+func (q *Query) JoinQuery(table string, fn func(b *qbapi.JoinClauseQueryBuilder)) *Query {
+	q.builder.JoinQuery(table, func(b *qbapi.JoinClauseQueryBuilder) { fn(b) })
+	return q
+}
+
+// LeftJoinQuery adds a LEFT JOIN with additional clauses defined in the callback.
+func (q *Query) LeftJoinQuery(table string, fn func(b *qbapi.JoinClauseQueryBuilder)) *Query {
+	q.builder.LeftJoinQuery(table, func(b *qbapi.JoinClauseQueryBuilder) { fn(b) })
+	return q
+}
+
+// RightJoinQuery adds a RIGHT JOIN with additional clauses defined in the callback.
+func (q *Query) RightJoinQuery(table string, fn func(b *qbapi.JoinClauseQueryBuilder)) *Query {
+	q.builder.RightJoinQuery(table, func(b *qbapi.JoinClauseQueryBuilder) { fn(b) })
+	return q
+}
+
+// JoinSubQuery joins a subquery with alias and join condition.
+func (q *Query) JoinSubQuery(sub *Query, alias, my, condition, target string) *Query {
+	q.builder.JoinSubQuery(sub.builder, alias, my, condition, target)
+	return q
+}
+
+// LeftJoinSubQuery performs a LEFT JOIN using a subquery.
+func (q *Query) LeftJoinSubQuery(sub *Query, alias, my, condition, target string) *Query {
+	q.builder.LeftJoinSubQuery(sub.builder, alias, my, condition, target)
+	return q
+}
+
+// RightJoinSubQuery performs a RIGHT JOIN using a subquery.
+func (q *Query) RightJoinSubQuery(sub *Query, alias, my, condition, target string) *Query {
+	q.builder.RightJoinSubQuery(sub.builder, alias, my, condition, target)
+	return q
+}
+
+// JoinLateral performs a LATERAL JOIN using a subquery.
+func (q *Query) JoinLateral(sub *Query, alias string) *Query {
+	q.builder.JoinLateral(sub.builder, alias)
+	return q
+}
+
+// LeftJoinLateral performs a LEFT LATERAL JOIN using a subquery.
+func (q *Query) LeftJoinLateral(sub *Query, alias string) *Query {
+	q.builder.LeftJoinLateral(sub.builder, alias)
+	return q
+}
+
 // LeftJoin adds LEFT JOIN clause.
 func (q *Query) LeftJoin(table, localColumn, cond, target string) *Query {
 	q.builder.LeftJoin(table, localColumn, cond, target)
@@ -326,6 +374,58 @@ func (q *Query) WhereRaw(raw string, vals map[string]any) *Query {
 // OrWhereRaw appends raw OR WHERE condition.
 func (q *Query) OrWhereRaw(raw string, vals map[string]any) *Query {
 	q.builder.OrWhereRaw(raw, vals)
+	return q
+}
+
+// SafeWhereRaw appends a raw WHERE condition ensuring a values map is always used.
+func (q *Query) SafeWhereRaw(raw string, vals map[string]any) *Query {
+	q.builder.SafeWhereRaw(raw, vals)
+	return q
+}
+
+// SafeOrWhereRaw appends a raw OR WHERE condition ensuring a values map is used.
+func (q *Query) SafeOrWhereRaw(raw string, vals map[string]any) *Query {
+	q.builder.SafeOrWhereRaw(raw, vals)
+	return q
+}
+
+// WhereGroup groups conditions with parentheses using AND logic.
+func (q *Query) WhereGroup(fn func(g *Query)) *Query {
+	q.builder.WhereGroup(func(b *qbapi.WhereSelectQueryBuilder) {
+		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
+		_ = setFieldValue(&grp.builder.WhereQueryBuilder, "builder", reflect.ValueOf(b.GetBuilder()))
+		fn(grp)
+	})
+	return q
+}
+
+// OrWhereGroup groups conditions with parentheses using OR logic.
+func (q *Query) OrWhereGroup(fn func(g *Query)) *Query {
+	q.builder.OrWhereGroup(func(b *qbapi.WhereSelectQueryBuilder) {
+		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
+		_ = setFieldValue(&grp.builder.WhereQueryBuilder, "builder", reflect.ValueOf(b.GetBuilder()))
+		fn(grp)
+	})
+	return q
+}
+
+// WhereNot groups conditions inside NOT (...).
+func (q *Query) WhereNot(fn func(g *Query)) *Query {
+	q.builder.WhereNot(func(b *qbapi.WhereSelectQueryBuilder) {
+		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
+		_ = setFieldValue(&grp.builder.WhereQueryBuilder, "builder", reflect.ValueOf(b.GetBuilder()))
+		fn(grp)
+	})
+	return q
+}
+
+// OrWhereNot groups conditions inside OR NOT (...).
+func (q *Query) OrWhereNot(fn func(g *Query)) *Query {
+	q.builder.OrWhereNot(func(b *qbapi.WhereSelectQueryBuilder) {
+		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
+		_ = setFieldValue(&grp.builder.WhereQueryBuilder, "builder", reflect.ValueOf(b.GetBuilder()))
+		fn(grp)
+	})
 	return q
 }
 
