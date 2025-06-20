@@ -48,40 +48,47 @@ func New(exec executor, table string, dialect driver.Dialect) *Query {
 	return &Query{builder: builder, exec: exec, dialect: dialect}
 }
 
-func newSelectBuilder(d driver.Dialect) *qbapi.SelectQueryBuilder {
-	switch d.(type) {
-	case driver.PostgresDialect:
-		return qbapi.NewSelectQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
-	default:
-		return qbapi.NewSelectQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+func builderByDialect[T any](d driver.Dialect, mysqlFn, pgFn func() T) T {
+	if _, ok := d.(driver.PostgresDialect); ok {
+		return pgFn()
 	}
+	return mysqlFn()
+}
+
+func newSelectBuilder(d driver.Dialect) *qbapi.SelectQueryBuilder {
+	return builderByDialect(d,
+		func() *qbapi.SelectQueryBuilder { return qbapi.NewSelectQueryBuilder(qbmysql.NewMySQLQueryBuilder()) },
+		func() *qbapi.SelectQueryBuilder {
+			return qbapi.NewSelectQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
+		},
+	)
 }
 
 func newInsertBuilder(d driver.Dialect) *qbapi.InsertQueryBuilder {
-	switch d.(type) {
-	case driver.PostgresDialect:
-		return qbapi.NewInsertQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
-	default:
-		return qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
-	}
+	return builderByDialect(d,
+		func() *qbapi.InsertQueryBuilder { return qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder()) },
+		func() *qbapi.InsertQueryBuilder {
+			return qbapi.NewInsertQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
+		},
+	)
 }
 
 func newUpdateBuilder(d driver.Dialect) *qbapi.UpdateQueryBuilder {
-	switch d.(type) {
-	case driver.PostgresDialect:
-		return qbapi.NewUpdateQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
-	default:
-		return qbapi.NewUpdateQueryBuilder(qbmysql.NewMySQLQueryBuilder())
-	}
+	return builderByDialect(d,
+		func() *qbapi.UpdateQueryBuilder { return qbapi.NewUpdateQueryBuilder(qbmysql.NewMySQLQueryBuilder()) },
+		func() *qbapi.UpdateQueryBuilder {
+			return qbapi.NewUpdateQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
+		},
+	)
 }
 
 func newDeleteBuilder(d driver.Dialect) *qbapi.DeleteQueryBuilder {
-	switch d.(type) {
-	case driver.PostgresDialect:
-		return qbapi.NewDeleteQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
-	default:
-		return qbapi.NewDeleteQueryBuilder(qbmysql.NewMySQLQueryBuilder())
-	}
+	return builderByDialect(d,
+		func() *qbapi.DeleteQueryBuilder { return qbapi.NewDeleteQueryBuilder(qbmysql.NewMySQLQueryBuilder()) },
+		func() *qbapi.DeleteQueryBuilder {
+			return qbapi.NewDeleteQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
+		},
+	)
 }
 
 // WithContext sets ctx on the query for context-aware execution.
@@ -890,10 +897,10 @@ func (q *Query) Update(data map[string]any) (sql.Result, error) {
 
 // Delete executes a DELETE query using current conditions.
 func (q *Query) Delete() (sql.Result, error) {
-	db := newDeleteBuilder(q.dialect)
-	db.Table(q.builder.GetQuery().Table.Name).Delete()
-	copyBuilderStateDelete(q.builder, db)
-	sqlStr, args, err := db.Build()
+	delBuilder := newDeleteBuilder(q.dialect)
+	delBuilder.Table(q.builder.GetQuery().Table.Name).Delete()
+	copyBuilderStateDelete(q.builder, delBuilder)
+	sqlStr, args, err := delBuilder.Build()
 	if err != nil {
 		return nil, err
 	}

@@ -40,14 +40,20 @@ func (db *DB) SQLDB() *sql.DB {
 	return db.drv.DB
 }
 
-// Open opens a MySQL database with default pooling.
+// Database driver names.
 const (
 	MySQL    = "mysql"
 	Postgres = "postgres"
 )
 
-// Open opens a database with default pooling for the given driver.
-func Open(driverName, dsn string) (*DB, error) {
+// Open opens a MySQL database with default pooling. Deprecated: use
+// OpenWithDriver to specify a driver explicitly.
+func Open(dsn string) (*DB, error) {
+	return OpenWithDriver(MySQL, dsn)
+}
+
+// OpenWithDriver opens a database with default pooling for the given driver.
+func OpenWithDriver(driverName, dsn string) (*DB, error) {
 	drv, err := driver.Open(driverName, dsn, 10, 10, time.Hour)
 	if err != nil {
 		return nil, err
