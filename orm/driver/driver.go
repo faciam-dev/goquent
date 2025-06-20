@@ -65,3 +65,12 @@ func (d *Driver) Transaction(fn func(Tx) error) error {
 	}
 	return tx.Commit()
 }
+
+// Begin starts a transaction and returns the Tx.
+func (d *Driver) Begin() (Tx, error) {
+	tx, err := d.DB.Begin()
+	if err != nil {
+		return Tx{}, err
+	}
+	return Tx{tx}, nil
+}
