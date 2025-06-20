@@ -2,10 +2,13 @@ package driver
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	// TODO: evaluate using a lightweight pq or pgx driver
+	_ "github.com/lib/pq"
 )
 
 // Dialect defines the SQL dialect abstraction.
@@ -16,6 +19,16 @@ type Dialect interface {
 
 // MySQLDialect implements Dialect for MySQL.
 type MySQLDialect struct{}
+
+// PostgresDialect implements Dialect for PostgreSQL.
+type PostgresDialect struct{}
+
+func (d PostgresDialect) Placeholder(n int) string { return fmt.Sprintf("$%d", n) }
+
+func (d PostgresDialect) QuoteIdent(ident string) string {
+	escaped := strings.ReplaceAll(ident, `"`, `""`)
+	return `"` + escaped + `"`
+}
 
 func (d MySQLDialect) Placeholder(_ int) string { return "?" }
 
@@ -31,8 +44,8 @@ type Driver struct {
 }
 
 // Open initializes the DB connection with pooling configuration.
-func Open(dsn string, maxOpen, maxIdle int, lifetime time.Duration) (*Driver, error) {
-	db, err := sql.Open("mysql", dsn)
+func Open(driverName, dsn string, maxOpen, maxIdle int, lifetime time.Duration) (*Driver, error) {
+	db, err := sql.Open(driverName, dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +55,18 @@ func Open(dsn string, maxOpen, maxIdle int, lifetime time.Duration) (*Driver, er
 	if err = db.Ping(); err != nil {
 		return nil, err
 	}
-	return &Driver{DB: db, Dialect: MySQLDialect{}}, nil
+
+	var dialect Dialect
+	switch driverName {
+	case "postgres":
+		dialect = PostgresDialect{}
+	case "mysql":
+		dialect = MySQLDialect{}
+	default:
+		return nil, fmt.Errorf("unsupported driver %s", driverName)
+	}
+
+	return &Driver{DB: db, Dialect: dialect}, nil
 }
 
 // Close closes the underlying DB.

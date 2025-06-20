@@ -17,7 +17,7 @@ type User struct {
 
 func setupDB(t testing.TB) *orm.DB {
 	dsn := "root:password@tcp(localhost:3306)/testdb?parseTime=true"
-	db, err := orm.Open(dsn)
+	db, err := orm.Open(orm.MySQL, dsn)
 	if err != nil {
 		if _, ok := err.(*net.OpError); ok {
 			t.Skip("mysql not available")

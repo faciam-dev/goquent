@@ -10,6 +10,8 @@ import (
 
 	qbapi "github.com/faciam-dev/goquent-query-builder/api"
 	qbmysql "github.com/faciam-dev/goquent-query-builder/database/mysql"
+	qbpostgres "github.com/faciam-dev/goquent-query-builder/database/postgres"
+	"github.com/faciam-dev/goquent/orm/driver"
 	"github.com/faciam-dev/goquent/orm/scanner"
 )
 
@@ -36,13 +38,50 @@ type Query struct {
 	exec    executor
 	ctx     context.Context
 	err     error
+	dialect driver.Dialect
 }
 
 // New creates a Query with given db and table.
-func New(exec executor, table string) *Query {
-	builder := qbapi.NewSelectQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+func New(exec executor, table string, dialect driver.Dialect) *Query {
+	builder := newSelectBuilder(dialect)
 	builder.Table(table)
-	return &Query{builder: builder, exec: exec}
+	return &Query{builder: builder, exec: exec, dialect: dialect}
+}
+
+func newSelectBuilder(d driver.Dialect) *qbapi.SelectQueryBuilder {
+	switch d.(type) {
+	case driver.PostgresDialect:
+		return qbapi.NewSelectQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
+	default:
+		return qbapi.NewSelectQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	}
+}
+
+func newInsertBuilder(d driver.Dialect) *qbapi.InsertQueryBuilder {
+	switch d.(type) {
+	case driver.PostgresDialect:
+		return qbapi.NewInsertQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
+	default:
+		return qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	}
+}
+
+func newUpdateBuilder(d driver.Dialect) *qbapi.UpdateQueryBuilder {
+	switch d.(type) {
+	case driver.PostgresDialect:
+		return qbapi.NewUpdateQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
+	default:
+		return qbapi.NewUpdateQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	}
+}
+
+func newDeleteBuilder(d driver.Dialect) *qbapi.DeleteQueryBuilder {
+	switch d.(type) {
+	case driver.PostgresDialect:
+		return qbapi.NewDeleteQueryBuilder(qbpostgres.NewPostgreSQLQueryBuilder())
+	default:
+		return qbapi.NewDeleteQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	}
 }
 
 // WithContext sets ctx on the query for context-aware execution.
@@ -760,7 +799,7 @@ func (q *Query) RawSQL() (string, error) { return q.builder.RawSql() }
 
 // Insert executes an INSERT with the given data.
 func (q *Query) Insert(data map[string]any) (sql.Result, error) {
-	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib := newInsertBuilder(q.dialect)
 	ib.Table(q.builder.GetQuery().Table.Name).Insert(data)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
@@ -784,7 +823,7 @@ func (q *Query) InsertGetId(data map[string]any) (int64, error) {
 
 // InsertBatch executes a bulk INSERT with the given slice of data maps.
 func (q *Query) InsertBatch(data []map[string]any) (sql.Result, error) {
-	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib := newInsertBuilder(q.dialect)
 	ib.Table(q.builder.GetQuery().Table.Name).InsertBatch(data)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
@@ -795,7 +834,7 @@ func (q *Query) InsertBatch(data []map[string]any) (sql.Result, error) {
 
 // InsertOrIgnore executes an INSERT IGNORE.
 func (q *Query) InsertOrIgnore(data []map[string]any) (sql.Result, error) {
-	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib := newInsertBuilder(q.dialect)
 	ib.Table(q.builder.GetQuery().Table.Name).InsertOrIgnore(data)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
@@ -806,7 +845,7 @@ func (q *Query) InsertOrIgnore(data []map[string]any) (sql.Result, error) {
 
 // Upsert executes an UPSERT using ON DUPLICATE KEY UPDATE.
 func (q *Query) Upsert(data []map[string]any, unique []string, updateCols []string) (sql.Result, error) {
-	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib := newInsertBuilder(q.dialect)
 	ib.Table(q.builder.GetQuery().Table.Name).Upsert(data, unique, updateCols)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
@@ -817,7 +856,7 @@ func (q *Query) Upsert(data []map[string]any, unique []string, updateCols []stri
 
 // UpdateOrInsert performs UPDATE or INSERT based on condition.
 func (q *Query) UpdateOrInsert(cond map[string]any, values map[string]any) (sql.Result, error) {
-	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib := newInsertBuilder(q.dialect)
 	ib.Table(q.builder.GetQuery().Table.Name).UpdateOrInsert(cond, values)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
@@ -828,7 +867,7 @@ func (q *Query) UpdateOrInsert(cond map[string]any, values map[string]any) (sql.
 
 // InsertUsing executes an INSERT INTO ... SELECT statement using columns from a subquery.
 func (q *Query) InsertUsing(columns []string, sub *Query) (sql.Result, error) {
-	ib := qbapi.NewInsertQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ib := newInsertBuilder(q.dialect)
 	ib.Table(q.builder.GetQuery().Table.Name).InsertUsing(columns, sub.builder)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
@@ -839,7 +878,7 @@ func (q *Query) InsertUsing(columns []string, sub *Query) (sql.Result, error) {
 
 // Update executes an UPDATE with the given data.
 func (q *Query) Update(data map[string]any) (sql.Result, error) {
-	ub := qbapi.NewUpdateQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	ub := newUpdateBuilder(q.dialect)
 	ub.Table(q.builder.GetQuery().Table.Name).Update(data)
 	copyBuilderState(q.builder, ub)
 	sqlStr, args, err := ub.Build()
@@ -851,7 +890,7 @@ func (q *Query) Update(data map[string]any) (sql.Result, error) {
 
 // Delete executes a DELETE query using current conditions.
 func (q *Query) Delete() (sql.Result, error) {
-	db := qbapi.NewDeleteQueryBuilder(qbmysql.NewMySQLQueryBuilder())
+	db := newDeleteBuilder(q.dialect)
 	db.Table(q.builder.GetQuery().Table.Name).Delete()
 	copyBuilderStateDelete(q.builder, db)
 	sqlStr, args, err := db.Build()

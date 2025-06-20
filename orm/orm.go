@@ -41,8 +41,14 @@ func (db *DB) SQLDB() *sql.DB {
 }
 
 // Open opens a MySQL database with default pooling.
-func Open(dsn string) (*DB, error) {
-	drv, err := driver.Open(dsn, 10, 10, time.Hour)
+const (
+	MySQL    = "mysql"
+	Postgres = "postgres"
+)
+
+// Open opens a database with default pooling for the given driver.
+func Open(driverName, dsn string) (*DB, error) {
+	drv, err := driver.Open(driverName, dsn, 10, 10, time.Hour)
 	if err != nil {
 		return nil, err
 	}
@@ -83,12 +89,12 @@ func (db *DB) Begin() (Tx, error) {
 
 // Model creates a query for the struct table.
 func (db *DB) Model(v any) *query.Query {
-	return query.New(db.exec, model.TableName(v))
+	return query.New(db.exec, model.TableName(v), db.drv.Dialect)
 }
 
 // Table creates a query for table name.
 func (db *DB) Table(name string) *query.Query {
-	return query.New(db.exec, name)
+	return query.New(db.exec, name, db.drv.Dialect)
 }
 
 // Query runs a raw SQL query returning multiple rows.

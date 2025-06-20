@@ -1,14 +1,16 @@
 # goquent ORM
 
 This package provides a minimal ORM built on top of [goquent-query-builder](https://github.com/faciam-dev/goquent-query-builder).
-It currently supports MySQL only.
+It supports MySQL and PostgreSQL.
 
 ## Usage
 ```go
 import "github.com/faciam-dev/goquent/orm/conv"
 import "log"
 
-orm, _ := orm.Open("root:password@tcp(localhost:3306)/testdb?parseTime=true")
+orm, _ := orm.Open(orm.MySQL, "root:password@tcp(localhost:3306)/testdb?parseTime=true")
+// PostgreSQL example
+// orm, _ := orm.Open(orm.Postgres, "postgres://user:pass@localhost/testdb?sslmode=disable")
 user := new(User)
 err := orm.Model(user).Where("id", 1).First(user)
 
@@ -86,8 +88,8 @@ The tests automatically create the required tables.
 Run benchmarks with `go test -bench . ./tests`.
 Results on a GitHub Codespace (Go 1.23) show ~1.5x speedup over GORM for scanning operations.
 
-## Extending to PostgreSQL
-The driver package is designed with dialect abstractions. Implementing a `postgresDialect` and adding support in `driver.Open` would enable PostgreSQL usage.
+## PostgreSQL Support
+The driver now includes a `PostgresDialect`. Use `orm.Open(orm.Postgres, dsn)` with a valid PostgreSQL DSN to connect.
 
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
