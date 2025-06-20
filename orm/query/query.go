@@ -800,10 +800,10 @@ func deepCopyJoins(jb any) reflect.Value {
 	for _, name := range []string{"Joins", "JoinClauses", "LateralJoins"} {
 		slice := joinsVal.Elem().FieldByName(name)
 		if slice.IsValid() && !slice.IsNil() {
-			elemType := slice.Type().Elem()
-			newSlice := reflect.MakeSlice(elemType, slice.Elem().Len(), slice.Elem().Len())
+			sliceType := slice.Type()
+			newSlice := reflect.MakeSlice(sliceType, slice.Elem().Len(), slice.Elem().Len())
 			reflect.Copy(newSlice, slice.Elem())
-			newSlicePtr := reflect.New(elemType)
+			newSlicePtr := reflect.New(sliceType)
 			newSlicePtr.Elem().Set(newSlice)
 			newJoins.Elem().FieldByName(name).Set(newSlicePtr)
 		}
