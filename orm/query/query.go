@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"unsafe"
 
 	qbapi "github.com/faciam-dev/goquent-query-builder/api"
 	qbmysql "github.com/faciam-dev/goquent-query-builder/database/mysql"
@@ -856,7 +857,7 @@ func copyBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.UpdateQueryBuild
 	// copy where
 	srcWb := src.GetWhereBuilder()
 	dstWb := dst.GetWhereBuilder()
-	_ = setFieldValue(dstWb, "query", reflect.ValueOf(srcWb).Elem().FieldByName("query"))
+	_ = setFieldValue(dstWb, "query", reflect.ValueOf(srcWb.GetQuery()))
 
 	// copy join
 	srcJb := src.GetJoinBuilder()
@@ -877,7 +878,7 @@ func copyBuilderStateDelete(src *qbapi.SelectQueryBuilder, dst *qbapi.DeleteQuer
 	// copy where
 	srcWb := src.GetWhereBuilder()
 	dstWb := dst.GetWhereBuilder()
-	_ = setFieldValue(dstWb, "query", reflect.ValueOf(srcWb).Elem().FieldByName("query"))
+	_ = setFieldValue(dstWb, "query", reflect.ValueOf(srcWb.GetQuery()))
 
 	// copy join
 	srcJb := src.GetJoinBuilder()
@@ -922,10 +923,8 @@ func setFieldValue(target any, field string, value reflect.Value) error {
 	if v.Type() != value.Type() {
 		return fmt.Errorf("type mismatch for field %q", field)
 	}
-	if !v.CanSet() {
-		return fmt.Errorf("cannot set field %q", field)
-	}
-	v.Set(value)
+	dest := reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
+	dest.Set(value)
 	return nil
 }
 
