@@ -24,6 +24,9 @@ if err != nil {
 var rows []map[string]any
 err = orm.Table("users").Where("age", ">", 20).GetMaps(&rows)
 
+var users []User
+err = orm.Model(&User{}).Where("age", ">", 20).Get(&users)
+
 // insert a record and get its auto-increment id
 newID, err := orm.Table("users").InsertGetId(map[string]any{"name": "sam", "age": 18})
 if err != nil {
