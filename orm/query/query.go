@@ -153,6 +153,23 @@ func (q *Query) GetMaps(dest *[]map[string]any) error {
 	return nil
 }
 
+// Get scans all rows into the slice pointed to by dest.
+func (q *Query) Get(dest any) error {
+	if q.err != nil {
+		return q.err
+	}
+	sqlStr, args, err := q.builder.Build()
+	if err != nil {
+		return err
+	}
+	rows, err := q.queryRows(sqlStr, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	return scanner.Structs(dest, rows)
+}
+
 // Limit sets a limit.
 func (q *Query) Limit(n int) *Query {
 	q.builder.Limit(int64(n))

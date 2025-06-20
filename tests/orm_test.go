@@ -71,6 +71,21 @@ func TestFirstMap(t *testing.T) {
 	}
 }
 
+func TestGetStructs(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	var users []User
+	if err := db.Model(&User{}).OrderBy("id", "asc").Get(&users); err != nil {
+		t.Fatalf("get structs: %v", err)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users, got %d", len(users))
+	}
+	if users[0].Name != "alice" || users[1].Name != "bob" {
+		t.Errorf("unexpected users: %+v", users)
+	}
+}
+
 func BenchmarkScannerMap(b *testing.B) {
 	db := setupDB(b)
 	defer db.Close()
