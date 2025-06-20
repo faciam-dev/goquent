@@ -38,6 +38,21 @@ err := orm.Transaction(func(tx orm.Tx) error {
 })
 ```
 
+Manual transaction control is also available:
+```go
+tx, err := orm.Begin()
+if err != nil {
+    log.Fatal(err)
+}
+if _, err = tx.Table("users").Insert(map[string]any{"name": "sam"}); err != nil {
+    tx.Rollback()
+    log.Fatal(err)
+}
+if err = tx.Commit(); err != nil {
+    log.Fatal(err)
+}
+```
+
 ## Project Structure
 The repository follows the Onion Architecture:
 

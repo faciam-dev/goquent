@@ -45,14 +45,27 @@ func Open(dsn string) (*DB, error) {
 func (db *DB) Close() error { return db.drv.Close() }
 
 // Tx represents a transaction-scoped DB wrapper.
-type Tx struct{ *DB }
+type Tx struct {
+	*DB
+	driver.Tx
+}
 
 // Transaction executes fn in a transaction.
 func (db *DB) Transaction(fn func(tx Tx) error) error {
 	return db.drv.Transaction(func(t driver.Tx) error {
 		txDB := &DB{drv: db.drv, exec: t.Tx}
-		return fn(Tx{txDB})
+		return fn(Tx{DB: txDB, Tx: t})
 	})
+}
+
+// Begin starts a transaction for manual control.
+func (db *DB) Begin() (Tx, error) {
+	t, err := db.drv.Begin()
+	if err != nil {
+		return Tx{}, err
+	}
+	txDB := &DB{drv: db.drv, exec: t.Tx}
+	return Tx{DB: txDB, Tx: t}, nil
 }
 
 // Model creates a query for the struct table.
