@@ -44,6 +44,11 @@ func Open(dsn string) (*DB, error) {
 // Close closes underlying DB.
 func (db *DB) Close() error { return db.drv.Close() }
 
+// newTransactionDB wraps a sql.Tx in a DB instance bound to the same driver.
+func (db *DB) newTransactionDB(tx *sql.Tx) *DB {
+	return &DB{drv: db.drv, exec: tx}
+}
+
 // Tx represents a transaction-scoped DB wrapper.
 type Tx struct {
 	*DB
@@ -53,7 +58,7 @@ type Tx struct {
 // Transaction executes fn in a transaction.
 func (db *DB) Transaction(fn func(tx Tx) error) error {
 	return db.drv.Transaction(func(t driver.Tx) error {
-		txDB := &DB{drv: db.drv, exec: t.Tx}
+		txDB := db.newTransactionDB(t.Tx)
 		return fn(Tx{DB: txDB, Tx: t})
 	})
 }
@@ -64,7 +69,7 @@ func (db *DB) Begin() (Tx, error) {
 	if err != nil {
 		return Tx{}, err
 	}
-	txDB := &DB{drv: db.drv, exec: t.Tx}
+	txDB := db.newTransactionDB(t.Tx)
 	return Tx{DB: txDB, Tx: t}, nil
 }
 
