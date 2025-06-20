@@ -63,7 +63,12 @@ func Map(rows *sql.Rows) (map[string]any, error) {
 	}
 	m := make(map[string]any, len(cols))
 	for i, c := range cols {
-		m[c] = reflect.ValueOf(vals[i]).Elem().Interface()
+		v := reflect.ValueOf(vals[i]).Elem().Interface()
+		if b, ok := v.([]byte); ok {
+			m[c] = string(b)
+		} else {
+			m[c] = v
+		}
 	}
 	return m, nil
 }
@@ -85,7 +90,12 @@ func Maps(rows *sql.Rows) ([]map[string]any, error) {
 		}
 		m := make(map[string]any, len(cols))
 		for i, c := range cols {
-			m[c] = reflect.ValueOf(vals[i]).Elem().Interface()
+			v := reflect.ValueOf(vals[i]).Elem().Interface()
+			if b, ok := v.([]byte); ok {
+				m[c] = string(b)
+			} else {
+				m[c] = v
+			}
 		}
 		list = append(list, m)
 	}
