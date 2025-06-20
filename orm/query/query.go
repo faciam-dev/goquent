@@ -891,8 +891,9 @@ func copyBuilderStateDelete(src *qbapi.SelectQueryBuilder, dst *qbapi.DeleteQuer
 	_ = setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
 }
 
-// deepCopyJoins clones the internal Joins struct of a JoinBuilder using
-// reflection. This avoids sharing slices between builders.
+// deepCopyJoins clones the Joins value from a JoinBuilder using reflection.
+// Each field of Joins is a pointer to a slice, so we copy the underlying
+// slices to ensure the destination builder can modify them independently.
 func deepCopyJoins(jb any) reflect.Value {
 	joinsVal := reflect.ValueOf(jb).Elem().FieldByName("Joins")
 	newJoins := reflect.New(joinsVal.Elem().Type())
@@ -900,7 +901,7 @@ func deepCopyJoins(jb any) reflect.Value {
 	for _, name := range []string{"Joins", "JoinClauses", "LateralJoins"} {
 		slice := joinsVal.Elem().FieldByName(name)
 		if slice.IsValid() && !slice.IsNil() {
-			sliceType := slice.Type()
+			sliceType := slice.Type().Elem()
 			newSlice := reflect.MakeSlice(sliceType, slice.Elem().Len(), slice.Elem().Len())
 			reflect.Copy(newSlice, slice.Elem())
 			newSlicePtr := reflect.New(sliceType)
