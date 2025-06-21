@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
-	"strings"
 	"unsafe"
 
 	qbapi "github.com/faciam-dev/goquent-query-builder/api"
@@ -126,22 +125,14 @@ func (q *Query) Where(col string, args ...any) *Query {
 	}
 	switch len(args) {
 	case 1:
-		if s, ok := args[0].(string); ok && strings.Contains(s, ".") {
-			q.builder.WhereColumn([]string{col, s}, col, "=", s)
-		} else {
-			q.builder.Where(col, "=", args[0])
-		}
+		q.builder.Where(col, "=", args[0])
 	case 2:
 		op, ok := args[0].(string)
 		if !ok {
 			q.err = fmt.Errorf("invalid operator type")
 			return q
 		}
-		if s, ok := args[1].(string); ok && strings.Contains(s, ".") {
-			q.builder.WhereColumn([]string{col, s}, col, op, s)
-		} else {
-			q.builder.Where(col, op, args[1])
-		}
+		q.builder.Where(col, op, args[1])
 	default:
 		q.err = fmt.Errorf("invalid Where usage")
 	}
