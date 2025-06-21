@@ -46,9 +46,18 @@ err := orm.Transaction(func(tx orm.Tx) error {
 })
 ```
 
+Context-aware transactions are also available:
+```go
+ctx := context.Background()
+err := orm.TransactionContext(ctx, func(tx orm.Tx) error {
+    return tx.Table("users").Where("id", 1).First(&user)
+})
+```
+
 Manual transaction control is also available:
 ```go
-tx, err := orm.Begin()
+ctx := context.Background()
+tx, err := orm.BeginTx(ctx, nil)
 if err != nil {
     log.Fatal(err)
 }

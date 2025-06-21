@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -93,6 +94,30 @@ func (d *Driver) Transaction(fn func(Tx) error) error {
 // Begin starts a transaction and returns the Tx.
 func (d *Driver) Begin() (Tx, error) {
 	tx, err := d.DB.Begin()
+	if err != nil {
+		return Tx{}, err
+	}
+	return Tx{tx}, nil
+}
+
+// TransactionContext executes fn within a transaction using ctx.
+func (d *Driver) TransactionContext(ctx context.Context, fn func(Tx) error) error {
+	tx, err := d.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if err = fn(Tx{tx}); err != nil {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			return rbErr
+		}
+		return err
+	}
+	return tx.Commit()
+}
+
+// BeginTx starts a transaction with ctx and returns the Tx.
+func (d *Driver) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error) {
+	tx, err := d.DB.BeginTx(ctx, opts)
 	if err != nil {
 		return Tx{}, err
 	}
