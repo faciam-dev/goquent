@@ -40,7 +40,7 @@ func TestUpdateWithCrossJoinDeepCopy(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
 
-	_, err := db.Table("users").CrossJoin("profiles").Where("profiles.user_id", "users.id").Where("profiles.bio", "=", "go developer").Update(map[string]any{"age": 60})
+	_, err := db.Table("users").CrossJoin("profiles").WhereColumn("profiles.user_id", "users.id").Where("profiles.bio", "=", "go developer").Update(map[string]any{"age": 60})
 	if err != nil {
 		t.Fatalf("update with cross join: %v", err)
 	}

@@ -61,6 +61,17 @@ if err = tx.Commit(); err != nil {
 }
 ```
 
+### Column comparisons
+Values passed to `Where` are always treated as literals. To compare one column
+against another, use `WhereColumn`:
+
+```go
+err := orm.Table("profiles").
+    WhereColumn("profiles.user_id", "users.id").
+    Where("profiles.bio", "=", "go developer").
+    FirstMap(&row)
+```
+
 ## Project Structure
 The repository follows the Onion Architecture:
 

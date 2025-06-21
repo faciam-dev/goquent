@@ -226,3 +226,37 @@ func TestWhereAnyAllSQL(t *testing.T) {
 		t.Errorf("expected AND in sql, got %s", sqlStr)
 	}
 }
+
+func TestWhereValueWithDot(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	if _, err := db.Table("users").Insert(map[string]any{"name": "a1.b2", "age": 22}); err != nil {
+		t.Fatalf("insert dotted value: %v", err)
+	}
+
+	var row map[string]any
+	if err := db.Table("users").Where("name", "a1.b2").FirstMap(&row); err != nil {
+		t.Fatalf("select dotted value: %v", err)
+	}
+	if row["age"] != int64(22) {
+		t.Errorf("expected age 22, got %v", row["age"])
+	}
+}
+
+func TestWhereValueWithDotOperator(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	if _, err := db.Table("users").Insert(map[string]any{"name": "a2.b3", "age": 33}); err != nil {
+		t.Fatalf("insert dotted value op: %v", err)
+	}
+
+	var row map[string]any
+	if err := db.Table("users").Where("name", "=", "a2.b3").FirstMap(&row); err != nil {
+		t.Fatalf("select dotted value op: %v", err)
+	}
+	if row["age"] != int64(33) {
+		t.Errorf("expected age 33, got %v", row["age"])
+	}
+}
