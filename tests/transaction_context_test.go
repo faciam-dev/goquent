@@ -113,3 +113,28 @@ func TestBeginTxCanceled(t *testing.T) {
 		t.Fatalf("expected canceled begin tx, got %v", err)
 	}
 }
+func TestBeginTxWithOptions(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	opts := &sql.TxOptions{Isolation: sql.LevelSerializable}
+	tx, err := db.BeginTx(ctx, opts)
+	if err != nil {
+		t.Fatalf("begin tx with opts: %v", err)
+	}
+	if _, err := tx.Table("users").Insert(map[string]any{"name": "ctx_opt", "age": 32}); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	var row map[string]any
+	if err := db.Table("users").Where("name", "ctx_opt").FirstMap(&row); err != nil {
+		t.Fatalf("select after commit: %v", err)
+	}
+	if row["age"] != int64(32) {
+		t.Errorf("expected age 32, got %v", row["age"])
+	}
+}

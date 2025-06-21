@@ -84,7 +84,7 @@ func (d *Driver) Transaction(fn func(Tx) error) error {
 	}
 	if err = fn(Tx{tx}); err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
-			return rbErr
+			return fmt.Errorf("transaction error: %w, rollback error: %v", err, rbErr)
 		}
 		return err
 	}
@@ -108,7 +108,7 @@ func (d *Driver) TransactionContext(ctx context.Context, fn func(Tx) error) erro
 	}
 	if err = fn(Tx{tx}); err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
-			return rbErr
+			return fmt.Errorf("transaction error: %w, rollback error: %v", err, rbErr)
 		}
 		return err
 	}

@@ -11,14 +11,14 @@ import (
        "log"
 )
 
-orm, _ := orm.OpenWithDriver(orm.MySQL, "root:password@tcp(localhost:3306)/testdb?parseTime=true")
+db, _ := orm.OpenWithDriver(orm.MySQL, "root:password@tcp(localhost:3306)/testdb?parseTime=true")
 // PostgreSQL example
-// orm, _ := orm.OpenWithDriver(orm.Postgres, "postgres://user:pass@localhost/testdb?sslmode=disable")
+// db, _ := orm.OpenWithDriver(orm.Postgres, "postgres://user:pass@localhost/testdb?sslmode=disable")
 user := new(User)
-err := orm.Model(user).Where("id", 1).First(user)
+err := db.Model(user).Where("id", 1).First(user)
 
 var row map[string]any
-err = orm.Table("users").Where("id", 1).FirstMap(&row)
+err = db.Table("users").Where("id", 1).FirstMap(&row)
 
 // fetch a typed value from a map
 id, err := conv.Value[uint64](row, "id")
@@ -27,13 +27,13 @@ if err != nil {
 }
 
 var rows []map[string]any
-err = orm.Table("users").Where("age", ">", 20).GetMaps(&rows)
+err = db.Table("users").Where("age", ">", 20).GetMaps(&rows)
 
 var users []User
-err = orm.Model(&User{}).Where("age", ">", 20).Get(&users)
+err = db.Model(&User{}).Where("age", ">", 20).Get(&users)
 
 // insert a record and get its auto-increment id
-newID, err := orm.Table("users").InsertGetId(map[string]any{"name": "sam", "age": 18})
+newID, err := db.Table("users").InsertGetId(map[string]any{"name": "sam", "age": 18})
 if err != nil {
     log.Fatal(err)
 }
@@ -41,7 +41,7 @@ if err != nil {
 
 Transactions are handled via `Transaction`:
 ```go
-err := orm.Transaction(func(tx orm.Tx) error {
+err := db.Transaction(func(tx orm.Tx) error {
     return tx.Table("users").Where("id", 1).First(&user)
 })
 ```
@@ -49,7 +49,7 @@ err := orm.Transaction(func(tx orm.Tx) error {
 Context-aware transactions are also available:
 ```go
 ctx := context.Background()
-err := orm.TransactionContext(ctx, func(tx orm.Tx) error {
+err := db.TransactionContext(ctx, func(tx orm.Tx) error {
     return tx.Table("users").Where("id", 1).First(&user)
 })
 ```
@@ -57,7 +57,7 @@ err := orm.TransactionContext(ctx, func(tx orm.Tx) error {
 Manual transaction control is also available:
 ```go
 ctx := context.Background()
-tx, err := orm.BeginTx(ctx, nil)
+tx, err := db.BeginTx(ctx, nil)
 if err != nil {
     log.Fatal(err)
 }
@@ -75,7 +75,7 @@ Values passed to `Where` are always treated as literals. To compare one column
 against another, use `WhereColumn`:
 
 ```go
-err := orm.Table("profiles").
+err := db.Table("profiles").
     WhereColumn("profiles.user_id", "users.id").
     Where("profiles.bio", "=", "go developer").
     FirstMap(&row)
