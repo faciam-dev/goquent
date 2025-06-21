@@ -83,9 +83,27 @@ func (db *DB) Transaction(fn func(tx Tx) error) error {
 	})
 }
 
+// TransactionContext executes fn in a transaction using ctx.
+func (db *DB) TransactionContext(ctx context.Context, fn func(tx Tx) error) error {
+	return db.drv.TransactionContext(ctx, func(t driver.Tx) error {
+		txDB := db.newTransactionDB(t.Tx)
+		return fn(Tx{DB: txDB, Tx: t})
+	})
+}
+
 // Begin starts a transaction for manual control.
 func (db *DB) Begin() (Tx, error) {
 	t, err := db.drv.Begin()
+	if err != nil {
+		return Tx{}, err
+	}
+	txDB := db.newTransactionDB(t.Tx)
+	return Tx{DB: txDB, Tx: t}, nil
+}
+
+// BeginTx starts a transaction using ctx and returns the Tx.
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error) {
+	t, err := db.drv.BeginTx(ctx, opts)
 	if err != nil {
 		return Tx{}, err
 	}
