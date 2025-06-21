@@ -118,7 +118,9 @@ func (q *Query) Select(cols ...string) *Query {
 	return q
 }
 
-// Where appends a condition.
+// Where appends a column/value comparison.
+// Values are always treated as literals. Use WhereColumn for
+// column-to-column comparisons.
 func (q *Query) Where(col string, args ...any) *Query {
 	if q.err != nil {
 		return q
