@@ -1,4 +1,5 @@
 # goquent ORM
+[![Docs](https://img.shields.io/badge/docs-API-blue.svg)](https://faciam-dev.github.io/goquent/)
 
 This package provides a minimal ORM built on top of [goquent-query-builder](https://github.com/faciam-dev/goquent-query-builder).
 It supports MySQL and PostgreSQL.
