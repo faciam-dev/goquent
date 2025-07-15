@@ -1022,8 +1022,15 @@ func setFieldValue(target any, field string, value reflect.Value) error {
 	if v.Type() != value.Type() {
 		return fmt.Errorf("type mismatch for field %q", field)
 	}
+	// Use unsafe to bypass Go's restrictions on setting unexported fields.
+	// v may reference a field from another package so we obtain a writable
+	// handle with reflect.NewAt and then assign through that handle.
 	dest := reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
-	dest.Set(value)
+	// Create an addressable copy of the value instead of relying on
+	// value.UnsafeAddr which may panic if the value is not addressable.
+	copyVal := reflect.New(value.Type()).Elem()
+	copyVal.Set(value)
+	dest.Set(copyVal)
 	return nil
 }
 

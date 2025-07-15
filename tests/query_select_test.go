@@ -100,6 +100,31 @@ func TestCountWhere(t *testing.T) {
 	}
 }
 
+func TestCountMultipleWhere(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	cases := []struct {
+		name string
+		user string
+		age  int
+		want int64
+	}{
+		{"match", "alice", 20, 1},
+		{"noMatch", "charlie", 20, 0},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := db.Table("users").Where("age", ">", tt.age).Where("name", "=", tt.user).Count("id")
+			if err != nil {
+				t.Fatalf("count multiple where: %v", err)
+			}
+			if c != tt.want {
+				t.Errorf("expected count %d, got %d", tt.want, c)
+			}
+		})
+	}
+}
+
 func TestCountJoin(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
