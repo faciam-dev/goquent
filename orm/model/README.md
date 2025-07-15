@@ -12,7 +12,7 @@ import "github.com/faciam-dev/goquent/orm/model"
 
 
 <a name="TableName"></a>
-## func [TableName](<https://github.com/faciam-dev/goquent/blob/main/orm/model/model.go#L69>)
+## func TableName
 
 ```go
 func TableName(v any) string

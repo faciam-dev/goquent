@@ -41,7 +41,7 @@ const (
 ```
 
 <a name="DB"></a>
-## type [DB](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L30-L33>)
+## type DB
 
 DB provides main ORM interface.
 
@@ -52,7 +52,7 @@ type DB struct {
 ```
 
 <a name="Open"></a>
-### func [Open](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L51>)
+### func Open
 
 ```go
 func Open(dsn string) (*DB, error)
@@ -61,7 +61,7 @@ func Open(dsn string) (*DB, error)
 Open opens a MySQL database with default pooling. Deprecated: use OpenWithDriver to specify a driver explicitly.
 
 <a name="OpenWithDriver"></a>
-### func [OpenWithDriver](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L56>)
+### func OpenWithDriver
 
 ```go
 func OpenWithDriver(driverName, dsn string) (*DB, error)
@@ -70,7 +70,7 @@ func OpenWithDriver(driverName, dsn string) (*DB, error)
 OpenWithDriver opens a database with default pooling for the given driver.
 
 <a name="DB.Begin"></a>
-### func \(\*DB\) [Begin](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L95>)
+### func \(\*DB\) Begin
 
 ```go
 func (db *DB) Begin() (Tx, error)
@@ -79,7 +79,7 @@ func (db *DB) Begin() (Tx, error)
 Begin starts a transaction for manual control.
 
 <a name="DB.BeginTx"></a>
-### func \(\*DB\) [BeginTx](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L105>)
+### func \(\*DB\) BeginTx
 
 ```go
 func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
@@ -88,7 +88,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
 BeginTx starts a transaction using ctx and returns the Tx.
 
 <a name="DB.Close"></a>
-### func \(\*DB\) [Close](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L65>)
+### func \(\*DB\) Close
 
 ```go
 func (db *DB) Close() error
@@ -97,7 +97,7 @@ func (db *DB) Close() error
 Close closes underlying DB.
 
 <a name="DB.Exec"></a>
-### func \(\*DB\) [Exec](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L135>)
+### func \(\*DB\) Exec
 
 ```go
 func (db *DB) Exec(query string, args ...any) (sql.Result, error)
@@ -106,7 +106,7 @@ func (db *DB) Exec(query string, args ...any) (sql.Result, error)
 Exec executes a raw SQL statement.
 
 <a name="DB.ExecContext"></a>
-### func \(\*DB\) [ExecContext](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L140>)
+### func \(\*DB\) ExecContext
 
 ```go
 func (db *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
@@ -115,7 +115,7 @@ func (db *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.R
 ExecContext executes a raw SQL statement with a context.
 
 <a name="DB.Model"></a>
-### func \(\*DB\) [Model](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L115>)
+### func \(\*DB\) Model
 
 ```go
 func (db *DB) Model(v any) *query.Query
@@ -124,7 +124,7 @@ func (db *DB) Model(v any) *query.Query
 Model creates a query for the struct table.
 
 <a name="DB.Query"></a>
-### func \(\*DB\) [Query](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L125>)
+### func \(\*DB\) Query
 
 ```go
 func (db *DB) Query(q string, args ...any) (*sql.Rows, error)
@@ -133,7 +133,7 @@ func (db *DB) Query(q string, args ...any) (*sql.Rows, error)
 Query runs a raw SQL query returning multiple rows.
 
 <a name="DB.QueryContext"></a>
-### func \(\*DB\) [QueryContext](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L130>)
+### func \(\*DB\) QueryContext
 
 ```go
 func (db *DB) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error)
@@ -142,7 +142,7 @@ func (db *DB) QueryContext(ctx context.Context, q string, args ...any) (*sql.Row
 QueryContext runs Query with a context.
 
 <a name="DB.QueryRow"></a>
-### func \(\*DB\) [QueryRow](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L145>)
+### func \(\*DB\) QueryRow
 
 ```go
 func (db *DB) QueryRow(query string, args ...any) *sql.Row
@@ -151,7 +151,7 @@ func (db *DB) QueryRow(query string, args ...any) *sql.Row
 QueryRow executes a query that is expected to return at most one row.
 
 <a name="DB.QueryRowContext"></a>
-### func \(\*DB\) [QueryRowContext](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L150>)
+### func \(\*DB\) QueryRowContext
 
 ```go
 func (db *DB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
@@ -160,7 +160,7 @@ func (db *DB) QueryRowContext(ctx context.Context, query string, args ...any) *s
 QueryRowContext executes a query with context returning at most one row.
 
 <a name="DB.SQLDB"></a>
-### func \(\*DB\) [SQLDB](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L36>)
+### func \(\*DB\) SQLDB
 
 ```go
 func (db *DB) SQLDB() *sql.DB
@@ -169,7 +169,7 @@ func (db *DB) SQLDB() *sql.DB
 SQLDB returns the underlying \*sql.DB.
 
 <a name="DB.Table"></a>
-### func \(\*DB\) [Table](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L120>)
+### func \(\*DB\) Table
 
 ```go
 func (db *DB) Table(name string) *query.Query
@@ -178,7 +178,7 @@ func (db *DB) Table(name string) *query.Query
 Table creates a query for table name.
 
 <a name="DB.Transaction"></a>
-### func \(\*DB\) [Transaction](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L79>)
+### func \(\*DB\) Transaction
 
 ```go
 func (db *DB) Transaction(fn func(tx Tx) error) error
@@ -187,7 +187,7 @@ func (db *DB) Transaction(fn func(tx Tx) error) error
 Transaction executes fn in a transaction.
 
 <a name="DB.TransactionContext"></a>
-### func \(\*DB\) [TransactionContext](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L87>)
+### func \(\*DB\) TransactionContext
 
 ```go
 func (db *DB) TransactionContext(ctx context.Context, fn func(tx Tx) error) error
@@ -196,7 +196,7 @@ func (db *DB) TransactionContext(ctx context.Context, fn func(tx Tx) error) erro
 TransactionContext executes fn in a transaction using ctx.
 
 <a name="Tx"></a>
-## type [Tx](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L73-L76>)
+## type Tx
 
 Tx represents a transaction\-scoped DB wrapper.
 
