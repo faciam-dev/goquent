@@ -100,6 +100,18 @@ func TestCountWhere(t *testing.T) {
 	}
 }
 
+func TestCountMultipleWhere(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	c, err := db.Table("users").Where("age", ">", 20).Where("name", "=", "alice").Count("id")
+	if err != nil {
+		t.Fatalf("count multiple where: %v", err)
+	}
+	if c != 1 {
+		t.Errorf("expected count 1, got %d", c)
+	}
+}
+
 func TestCountJoin(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()

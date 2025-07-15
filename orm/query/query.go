@@ -1023,7 +1023,9 @@ func setFieldValue(target any, field string, value reflect.Value) error {
 		return fmt.Errorf("type mismatch for field %q", field)
 	}
 	dest := reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
-	dest.Set(value)
+	src := reflect.NewAt(value.Type(), unsafe.Pointer(value.UnsafeAddr())).Elem()
+	src.Set(value)
+	dest.Set(src)
 	return nil
 }
 
