@@ -964,7 +964,9 @@ func copyBuilderStateDelete(src *qbapi.SelectQueryBuilder, dst *qbapi.DeleteQuer
 	_ = setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
 }
 
-// copySelectBuilderState duplicates where, join, group and lock clauses from src to dst.
+// copySelectBuilderState duplicates where, join, group and lock clauses from src
+// to dst. This relies on reflection because goquent-query-builder does not
+// expose a safe cloning API. TODO: replace this with qbapi.Clone when available.
 func copySelectBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.SelectQueryBuilder) {
 	srcWb := src.GetWhereBuilder()
 	dstWb := dst.GetWhereBuilder()
