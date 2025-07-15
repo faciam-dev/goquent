@@ -12,7 +12,7 @@ import "github.com/faciam-dev/goquent/orm/query"
   - [func New\(exec executor, table string, dialect driver.Dialect\) \*Query](<#New>)
   - [func \(q \*Query\) Avg\(col string\) \*Query](<#Query.Avg>)
   - [func \(q \*Query\) Build\(\) \(string, \[\]any, error\)](<#Query.Build>)
-  - [func \(q \*Query\) Count\(cols ...string\) \*Query](<#Query.Count>)
+  - [func \(q \*Query\) Count\(cols ...string\) (int64, error)](<#Query.Count>)
   - [func \(q \*Query\) CrossJoin\(table string\) \*Query](<#Query.CrossJoin>)
   - [func \(q \*Query\) Delete\(\) \(sql.Result, error\)](<#Query.Delete>)
   - [func \(q \*Query\) Distinct\(cols ...string\) \*Query](<#Query.Distinct>)
@@ -159,10 +159,11 @@ Build returns the SQL and args.
 ### func \(\*Query\) Count
 
 ```go
-func (q *Query) Count(cols ...string) *Query
+func (q *Query) Count(cols ...string) (int64, error)
 ```
 
-Count adds COUNT aggregate functions.
+Count executes a COUNT query and returns the row count. Pagination clauses such
+as `Limit` and `Offset` are ignored when generating the COUNT query.
 
 <a name="Query.CrossJoin"></a>
 ### func \(\*Query\) CrossJoin

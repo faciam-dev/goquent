@@ -63,3 +63,51 @@ func TestJoinSelect(t *testing.T) {
 		t.Errorf("unexpected row: %v", row)
 	}
 }
+
+func TestCount(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	c, err := db.Table("users").Count()
+	if err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if c != 2 {
+		t.Errorf("expected count 2, got %d", c)
+	}
+}
+
+func TestCountColumn(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	c, err := db.Table("users").Count("id")
+	if err != nil {
+		t.Fatalf("count column: %v", err)
+	}
+	if c != 2 {
+		t.Errorf("expected count 2, got %d", c)
+	}
+}
+
+func TestCountWhere(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	c, err := db.Table("users").Where("age", ">", 25).Count()
+	if err != nil {
+		t.Fatalf("count where: %v", err)
+	}
+	if c != 1 {
+		t.Errorf("expected count 1, got %d", c)
+	}
+}
+
+func TestCountJoin(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	c, err := db.Table("users").Join("profiles", "users.id", "=", "profiles.user_id").Where("profiles.bio", "like", "%go%").Count()
+	if err != nil {
+		t.Fatalf("count join: %v", err)
+	}
+	if c != 1 {
+		t.Errorf("expected count 1, got %d", c)
+	}
+}
