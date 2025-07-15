@@ -987,8 +987,8 @@ func copySelectBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.SelectQuer
 	dstSB := reflect.ValueOf(dst).Elem().FieldByName("builder").Elem()
 	srcSel := srcSB.FieldByName("selectQuery").Elem()
 	dstSel := dstSB.FieldByName("selectQuery").Elem()
-	dstSel.FieldByName("Group").Set(srcSel.FieldByName("Group"))
-	dstSel.FieldByName("Lock").Set(srcSel.FieldByName("Lock"))
+	_ = setFieldValue(dstSel.Addr().Interface(), "Group", srcSel.FieldByName("Group"))
+	_ = setFieldValue(dstSel.Addr().Interface(), "Lock", srcSel.FieldByName("Lock"))
 }
 
 // deepCopyJoins clones the Joins value from a JoinBuilder using reflection.
