@@ -159,10 +159,10 @@ Build returns the SQL and args.
 ### func \(\*Query\) Count
 
 ```go
-func (q *Query) Count(cols ...string) *Query
+func (q *Query) Count(cols ...string) (int64, error)
 ```
 
-Count adds COUNT aggregate functions.
+Count executes a COUNT query and returns the row count.
 
 <a name="Query.CrossJoin"></a>
 ### func \(\*Query\) CrossJoin

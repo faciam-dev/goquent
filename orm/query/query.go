@@ -237,10 +237,34 @@ func (q *Query) SelectRaw(raw string, values ...any) *Query {
 	return q
 }
 
-// Count adds COUNT aggregate functions.
-func (q *Query) Count(cols ...string) *Query {
-	q.builder.Count(cols...)
-	return q
+// Count executes a COUNT query using the current conditions and returns the
+// resulting row count.
+func (q *Query) Count(cols ...string) (int64, error) {
+	if q.err != nil {
+		return 0, q.err
+	}
+
+	b := newSelectBuilder(q.dialect)
+	b.Table(q.builder.GetQuery().Table.Name)
+	copySelectBuilderState(q.builder, b)
+	b.Count(cols...)
+
+	sqlStr, args, err := b.Build()
+	if err != nil {
+		return 0, err
+	}
+
+	var row *sql.Row
+	if q.ctx != nil {
+		row = q.exec.QueryRowContext(q.ctx, sqlStr, args...)
+	} else {
+		row = q.exec.QueryRow(sqlStr, args...)
+	}
+	var c int64
+	if err := row.Scan(&c); err != nil {
+		return 0, err
+	}
+	return c, nil
 }
 
 // Distinct marks columns as DISTINCT.
@@ -938,6 +962,31 @@ func copyBuilderStateDelete(src *qbapi.SelectQueryBuilder, dst *qbapi.DeleteQuer
 	srcOb := src.GetOrderByBuilder()
 	dstOb := dst.GetOrderByBuilder()
 	_ = setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
+}
+
+// copySelectBuilderState duplicates where, join, group and lock clauses from src to dst.
+func copySelectBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.SelectQueryBuilder) {
+	srcWb := src.GetWhereBuilder()
+	dstWb := dst.GetWhereBuilder()
+	clonedWhere := reflect.New(reflect.ValueOf(srcWb.GetQuery()).Elem().Type())
+	clonedWhere.Elem().Set(reflect.ValueOf(srcWb.GetQuery()).Elem())
+	_ = setFieldValue(dstWb, "query", clonedWhere)
+
+	srcJb := src.GetJoinBuilder()
+	dstJb := dst.GetJoinBuilder()
+	newJoins := deepCopyJoins(srcJb)
+	_ = setFieldValue(dstJb, "Joins", newJoins)
+
+	srcOb := src.GetOrderByBuilder()
+	dstOb := dst.GetOrderByBuilder()
+	_ = setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
+
+	srcSB := reflect.ValueOf(src).Elem().FieldByName("builder").Elem()
+	dstSB := reflect.ValueOf(dst).Elem().FieldByName("builder").Elem()
+	srcSel := srcSB.FieldByName("selectQuery").Elem()
+	dstSel := dstSB.FieldByName("selectQuery").Elem()
+	dstSel.FieldByName("Group").Set(srcSel.FieldByName("Group"))
+	dstSel.FieldByName("Lock").Set(srcSel.FieldByName("Lock"))
 }
 
 // deepCopyJoins clones the Joins value from a JoinBuilder using reflection.

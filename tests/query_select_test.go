@@ -63,3 +63,15 @@ func TestJoinSelect(t *testing.T) {
 		t.Errorf("unexpected row: %v", row)
 	}
 }
+
+func TestCount(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	c, err := db.Table("users").Count()
+	if err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if c != 2 {
+		t.Errorf("expected count 2, got %d", c)
+	}
+}
