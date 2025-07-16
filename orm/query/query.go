@@ -468,7 +468,7 @@ func (q *Query) SafeOrWhereRaw(raw string, vals map[string]any) *Query {
 func (q *Query) WhereGroup(fn func(g *Query)) *Query {
 	q.builder.WhereGroup(func(b *qbapi.WhereSelectQueryBuilder) {
 		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
-		_ = setFieldValue(&grp.builder.WhereQueryBuilder, "builder", reflect.ValueOf(b.GetBuilder()))
+		_ = setFieldValue(reflect.ValueOf(&grp.builder.WhereQueryBuilder), "builder", reflect.ValueOf(b.GetBuilder()))
 		fn(grp)
 	})
 	return q
@@ -478,7 +478,7 @@ func (q *Query) WhereGroup(fn func(g *Query)) *Query {
 func (q *Query) OrWhereGroup(fn func(g *Query)) *Query {
 	q.builder.OrWhereGroup(func(b *qbapi.WhereSelectQueryBuilder) {
 		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
-		_ = setFieldValue(&grp.builder.WhereQueryBuilder, "builder", reflect.ValueOf(b.GetBuilder()))
+		_ = setFieldValue(reflect.ValueOf(&grp.builder.WhereQueryBuilder), "builder", reflect.ValueOf(b.GetBuilder()))
 		fn(grp)
 	})
 	return q
@@ -488,7 +488,7 @@ func (q *Query) OrWhereGroup(fn func(g *Query)) *Query {
 func (q *Query) WhereNot(fn func(g *Query)) *Query {
 	q.builder.WhereNot(func(b *qbapi.WhereSelectQueryBuilder) {
 		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
-		_ = setFieldValue(&grp.builder.WhereQueryBuilder, "builder", reflect.ValueOf(b.GetBuilder()))
+		_ = setFieldValue(reflect.ValueOf(&grp.builder.WhereQueryBuilder), "builder", reflect.ValueOf(b.GetBuilder()))
 		fn(grp)
 	})
 	return q
@@ -498,7 +498,7 @@ func (q *Query) WhereNot(fn func(g *Query)) *Query {
 func (q *Query) OrWhereNot(fn func(g *Query)) *Query {
 	q.builder.OrWhereNot(func(b *qbapi.WhereSelectQueryBuilder) {
 		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
-		_ = setFieldValue(&grp.builder.WhereQueryBuilder, "builder", reflect.ValueOf(b.GetBuilder()))
+		_ = setFieldValue(reflect.ValueOf(&grp.builder.WhereQueryBuilder), "builder", reflect.ValueOf(b.GetBuilder()))
 		fn(grp)
 	})
 	return q
@@ -931,7 +931,7 @@ func copyBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.UpdateQueryBuild
 	// copy where
 	srcWb := src.GetWhereBuilder()
 	dstWb := dst.GetWhereBuilder()
-	_ = setFieldValue(dstWb, "query", reflect.ValueOf(srcWb.GetQuery()))
+	_ = setFieldValue(reflect.ValueOf(dstWb), "query", reflect.ValueOf(srcWb.GetQuery()))
 
 	// copy join
 	srcJb := src.GetJoinBuilder()
@@ -939,12 +939,12 @@ func copyBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.UpdateQueryBuild
 	// deep copy joins to avoid sharing slices between builders. The query
 	// builder does not expose a cloning API, so reflection is used here.
 	newJoins := deepCopyJoins(srcJb)
-	_ = setFieldValue(dstJb, "Joins", newJoins)
+	_ = setFieldValue(reflect.ValueOf(dstJb), "Joins", newJoins)
 
 	// copy order
 	srcOb := src.GetOrderByBuilder()
 	dstOb := dst.GetOrderByBuilder()
-	_ = setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
+	_ = setFieldValue(reflect.ValueOf(dstOb), "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
 }
 
 // copyBuilderStateDelete duplicates where, join and order clauses from src to a DeleteQueryBuilder.
@@ -952,18 +952,18 @@ func copyBuilderStateDelete(src *qbapi.SelectQueryBuilder, dst *qbapi.DeleteQuer
 	// copy where
 	srcWb := src.GetWhereBuilder()
 	dstWb := dst.GetWhereBuilder()
-	_ = setFieldValue(dstWb, "query", reflect.ValueOf(srcWb.GetQuery()))
+	_ = setFieldValue(reflect.ValueOf(dstWb), "query", reflect.ValueOf(srcWb.GetQuery()))
 
 	// copy join
 	srcJb := src.GetJoinBuilder()
 	dstJb := dst.GetJoinBuilder()
 	newJoins := deepCopyJoins(srcJb)
-	_ = setFieldValue(dstJb, "Joins", newJoins)
+	_ = setFieldValue(reflect.ValueOf(dstJb), "Joins", newJoins)
 
 	// copy order
 	srcOb := src.GetOrderByBuilder()
 	dstOb := dst.GetOrderByBuilder()
-	_ = setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
+	_ = setFieldValue(reflect.ValueOf(dstOb), "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
 }
 
 // copySelectBuilderState duplicates where, join, group and lock clauses from src
@@ -974,20 +974,20 @@ func copySelectBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.SelectQuer
 	dstWb := dst.GetWhereBuilder()
 	clonedWhere := reflect.New(reflect.ValueOf(srcWb.GetQuery()).Elem().Type())
 	clonedWhere.Elem().Set(reflect.ValueOf(srcWb.GetQuery()).Elem())
-	if err := setFieldValue(dstWb, "query", clonedWhere); err != nil {
+	if err := setFieldValue(reflect.ValueOf(dstWb), "query", clonedWhere); err != nil {
 		return err
 	}
 
 	srcJb := src.GetJoinBuilder()
 	dstJb := dst.GetJoinBuilder()
 	newJoins := deepCopyJoins(srcJb)
-	if err := setFieldValue(dstJb, "Joins", newJoins); err != nil {
+	if err := setFieldValue(reflect.ValueOf(dstJb), "Joins", newJoins); err != nil {
 		return err
 	}
 
 	srcOb := src.GetOrderByBuilder()
 	dstOb := dst.GetOrderByBuilder()
-	if err := setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order")); err != nil {
+	if err := setFieldValue(reflect.ValueOf(dstOb), "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order")); err != nil {
 		return err
 	}
 
@@ -995,10 +995,13 @@ func copySelectBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.SelectQuer
 	dstSB := reflect.ValueOf(dst).Elem().FieldByName("builder").Elem()
 	srcSel := srcSB.FieldByName("selectQuery").Elem()
 	dstSel := dstSB.FieldByName("selectQuery").Elem()
-	if err := setFieldValue(dstSel.Addr().Interface(), "Group", srcSel.FieldByName("Group")); err != nil {
+
+	dstSelAddr := reflect.NewAt(dstSel.Type(), unsafe.Pointer(dstSel.UnsafeAddr())).Elem()
+
+	if err := setFieldValue(dstSelAddr.Addr(), "Group", srcSel.FieldByName("Group")); err != nil {
 		return err
 	}
-	if err := setFieldValue(dstSel.Addr().Interface(), "Lock", srcSel.FieldByName("Lock")); err != nil {
+	if err := setFieldValue(dstSelAddr.Addr(), "Lock", srcSel.FieldByName("Lock")); err != nil {
 		return err
 	}
 
@@ -1028,8 +1031,8 @@ func deepCopyJoins(jb any) reflect.Value {
 
 // setFieldValue assigns value to an exported field using reflection.
 // If the target field is unexported or cannot be set, it returns an error.
-func setFieldValue(target any, field string, value reflect.Value) error {
-	v := reflect.ValueOf(target).Elem().FieldByName(field)
+func setFieldValue(targetValue reflect.Value, field string, value reflect.Value) error {
+	v := targetValue.Elem().FieldByName(field)
 	if !v.IsValid() {
 		return fmt.Errorf("field %q does not exist in target", field)
 	}
