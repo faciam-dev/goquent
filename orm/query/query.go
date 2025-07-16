@@ -1039,15 +1039,26 @@ func setFieldValue(targetValue reflect.Value, field string, value reflect.Value)
 	if v.Type() != value.Type() {
 		return fmt.Errorf("type mismatch for field %q", field)
 	}
+
 	// Use unsafe to bypass Go's restrictions on setting unexported fields.
-	// v may reference a field from another package so we obtain a writable
-	// handle with reflect.NewAt and then assign through that handle.
+	// We create a writable handle for the destination field.
 	dest := reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
-	// Create an addressable copy of the value instead of relying on
-	// value.UnsafeAddr which may panic if the value is not addressable.
-	copyVal := reflect.New(value.Type()).Elem()
-	copyVal.Set(value)
-	dest.Set(copyVal)
+
+	// For the source value, we need to handle unexported fields carefully.
+	// Instead of using Set which checks for exportedness, we copy the memory directly.
+	if value.Type().Size() > 0 {
+		// Use unsafe to copy the memory from source to destination
+		srcPtr := unsafe.Pointer(value.UnsafeAddr())
+		dstPtr := unsafe.Pointer(dest.UnsafeAddr())
+
+		// Copy the memory using memmove-like operation
+		// This is safer than byte-by-byte copying for complex types
+		size := int(value.Type().Size())
+		destSlice := unsafe.Slice((*byte)(dstPtr), size)
+		srcSlice := unsafe.Slice((*byte)(srcPtr), size)
+		copy(destSlice, srcSlice)
+	}
+
 	return nil
 }
 
