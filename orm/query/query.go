@@ -246,7 +246,9 @@ func (q *Query) Count(cols ...string) (int64, error) {
 
 	b := newSelectBuilder(q.dialect)
 	b.Table(q.builder.GetQuery().Table.Name)
-	copySelectBuilderState(q.builder, b)
+	if err := copySelectBuilderState(q.builder, b); err != nil {
+		return 0, err
+	}
 	b.Count(cols...)
 
 	sqlStr, args, err := b.Build()
@@ -967,28 +969,40 @@ func copyBuilderStateDelete(src *qbapi.SelectQueryBuilder, dst *qbapi.DeleteQuer
 // copySelectBuilderState duplicates where, join, group and lock clauses from src
 // to dst. This relies on reflection because goquent-query-builder does not
 // expose a safe cloning API. TODO: replace this with qbapi.Clone when available.
-func copySelectBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.SelectQueryBuilder) {
+func copySelectBuilderState(src *qbapi.SelectQueryBuilder, dst *qbapi.SelectQueryBuilder) error {
 	srcWb := src.GetWhereBuilder()
 	dstWb := dst.GetWhereBuilder()
 	clonedWhere := reflect.New(reflect.ValueOf(srcWb.GetQuery()).Elem().Type())
 	clonedWhere.Elem().Set(reflect.ValueOf(srcWb.GetQuery()).Elem())
-	_ = setFieldValue(dstWb, "query", clonedWhere)
+	if err := setFieldValue(dstWb, "query", clonedWhere); err != nil {
+		return err
+	}
 
 	srcJb := src.GetJoinBuilder()
 	dstJb := dst.GetJoinBuilder()
 	newJoins := deepCopyJoins(srcJb)
-	_ = setFieldValue(dstJb, "Joins", newJoins)
+	if err := setFieldValue(dstJb, "Joins", newJoins); err != nil {
+		return err
+	}
 
 	srcOb := src.GetOrderByBuilder()
 	dstOb := dst.GetOrderByBuilder()
-	_ = setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order"))
+	if err := setFieldValue(dstOb, "Order", reflect.ValueOf(srcOb).Elem().FieldByName("Order")); err != nil {
+		return err
+	}
 
 	srcSB := reflect.ValueOf(src).Elem().FieldByName("builder").Elem()
 	dstSB := reflect.ValueOf(dst).Elem().FieldByName("builder").Elem()
 	srcSel := srcSB.FieldByName("selectQuery").Elem()
 	dstSel := dstSB.FieldByName("selectQuery").Elem()
-	_ = setFieldValue(dstSel.Addr().Interface(), "Group", srcSel.FieldByName("Group"))
-	_ = setFieldValue(dstSel.Addr().Interface(), "Lock", srcSel.FieldByName("Lock"))
+	if err := setFieldValue(dstSel.Addr().Interface(), "Group", srcSel.FieldByName("Group")); err != nil {
+		return err
+	}
+	if err := setFieldValue(dstSel.Addr().Interface(), "Lock", srcSel.FieldByName("Lock")); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // deepCopyJoins clones the Joins value from a JoinBuilder using reflection.
