@@ -1044,22 +1044,94 @@ func setFieldValue(targetValue reflect.Value, field string, value reflect.Value)
 	// We create a writable handle for the destination field.
 	dest := reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
 
-	// For the source value, we need to handle unexported fields carefully.
-	// Instead of using Set which checks for exportedness, we copy the memory directly.
-	if value.Type().Size() > 0 {
-		// Use unsafe to copy the memory from source to destination
-		srcPtr := unsafe.Pointer(value.UnsafeAddr())
-		dstPtr := unsafe.Pointer(dest.UnsafeAddr())
-
-		// Copy the memory using memmove-like operation
-		// This is safer than byte-by-byte copying for complex types
-		size := int(value.Type().Size())
-		destSlice := unsafe.Slice((*byte)(dstPtr), size)
-		srcSlice := unsafe.Slice((*byte)(srcPtr), size)
-		copy(destSlice, srcSlice)
+	// Special handling for zero-size types
+	if value.Type().Size() == 0 {
+		return nil
 	}
 
+	// Handle the case where value might not be addressable
+	if !value.CanAddr() {
+		// For non-addressable values, we need to make them addressable first
+		// Create a new value of the same type and copy the content
+		tempValue := reflect.New(value.Type()).Elem()
+
+		// Use a different approach based on whether we can get the interface
+		if value.CanInterface() {
+			// For interface-able values, we can safely recreate them
+			tempValue.Set(reflect.ValueOf(value.Interface()))
+			value = tempValue
+		} else {
+			// For non-interface-able values, try to copy using reflection
+			// This works for most basic types and some complex types
+			if copyValueByReflection(tempValue, value) {
+				value = tempValue
+			} else {
+				return fmt.Errorf("cannot copy non-addressable value for field %q", field)
+			}
+		}
+	}
+
+	// Now both src and dst should be addressable
+	srcPtr := unsafe.Pointer(value.UnsafeAddr())
+	dstPtr := unsafe.Pointer(dest.UnsafeAddr())
+	size := int(value.Type().Size())
+
+	// Copy memory directly
+	destSlice := unsafe.Slice((*byte)(dstPtr), size)
+	srcSlice := unsafe.Slice((*byte)(srcPtr), size)
+	copy(destSlice, srcSlice)
+
 	return nil
+}
+
+// copyValueByReflection attempts to copy value using pure reflection
+// Returns true if successful, false otherwise
+func copyValueByReflection(dst, src reflect.Value) bool {
+	if dst.Type() != src.Type() {
+		return false
+	}
+
+	switch src.Kind() {
+	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128, reflect.String:
+		// For basic types, we can try to extract and set the value
+		if src.CanInterface() {
+			dst.Set(reflect.ValueOf(src.Interface()))
+			return true
+		}
+		return false
+	case reflect.Slice, reflect.Array:
+		// For slices and arrays, copy element by element
+		if src.Len() != dst.Len() {
+			return false
+		}
+		for i := 0; i < src.Len(); i++ {
+			if !copyValueByReflection(dst.Index(i), src.Index(i)) {
+				return false
+			}
+		}
+		return true
+	case reflect.Struct:
+		// For structs, copy field by field
+		for i := 0; i < src.NumField(); i++ {
+			if !copyValueByReflection(dst.Field(i), src.Field(i)) {
+				return false
+			}
+		}
+		return true
+	case reflect.Ptr:
+		if src.IsNil() {
+			dst.Set(reflect.Zero(dst.Type()))
+			return true
+		}
+		if dst.IsNil() {
+			dst.Set(reflect.New(src.Type().Elem()))
+		}
+		return copyValueByReflection(dst.Elem(), src.Elem())
+	default:
+		return false
+	}
 }
 
 // gatherColumns extracts unique column names from column comparison slices.
