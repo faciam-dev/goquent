@@ -3,6 +3,8 @@ package orm
 import (
 	"context"
 	"database/sql"
+	sqldriver "database/sql/driver"
+	"fmt"
 	"time"
 
 	"github.com/faciam-dev/goquent/orm/driver"
@@ -54,6 +56,33 @@ func Open(dsn string) (*DB, error) {
 
 // OpenWithDriver opens a database with default pooling for the given driver.
 func OpenWithDriver(driverName, dsn string) (*DB, error) {
+	if drv, ok := GetDriver(driverName); ok {
+		dc, ok := drv.(sqldriver.DriverContext)
+		if !ok {
+			return nil, fmt.Errorf("driver %q does not implement DriverContext", driverName)
+		}
+		connector, err := dc.OpenConnector(dsn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create connector: %w", err)
+		}
+		sqlDB := sql.OpenDB(connector)
+		sqlDB.SetMaxOpenConns(10)
+		sqlDB.SetMaxIdleConns(10)
+		sqlDB.SetConnMaxLifetime(time.Hour)
+		if err = sqlDB.Ping(); err != nil {
+			return nil, err
+		}
+		var dialect driver.Dialect
+		switch driverName {
+		case Postgres:
+			dialect = driver.PostgresDialect{}
+		default:
+			dialect = driver.MySQLDialect{}
+		}
+		d := &driver.Driver{DB: sqlDB, Dialect: dialect}
+		return &DB{drv: d, exec: sqlDB}, nil
+	}
+
 	drv, err := driver.Open(driverName, dsn, 10, 10, time.Hour)
 	if err != nil {
 		return nil, err

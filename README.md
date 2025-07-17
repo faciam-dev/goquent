@@ -115,5 +115,13 @@ Results on a GitHub Codespace (Go 1.23) show ~1.5x speedup over GORM for scannin
 ## PostgreSQL Support
 The driver now includes a `PostgresDialect`. Use `orm.OpenWithDriver(orm.Postgres, dsn)` with a valid PostgreSQL DSN to connect.
 
+### Custom Drivers
+Additional `database/sql` drivers can be registered with `orm.RegisterDriver` and opened by name:
+
+```go
+orm.RegisterDriver("mysql-custom", &mysql.MySQLDriver{})
+db, err := orm.OpenWithDriver("mysql-custom", dsn)
+```
+
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
