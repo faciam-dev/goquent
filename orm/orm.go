@@ -3,6 +3,9 @@ package orm
 import (
 	"context"
 	"database/sql"
+	sqldriver "database/sql/driver"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/faciam-dev/goquent/orm/driver"
@@ -46,6 +49,13 @@ const (
 	Postgres = "postgres"
 )
 
+func defaultDialect(name string) driver.Dialect {
+	if strings.Contains(strings.ToLower(name), "postgres") {
+		return driver.PostgresDialect{}
+	}
+	return driver.MySQLDialect{}
+}
+
 // Open opens a MySQL database with default pooling. Deprecated: use
 // OpenWithDriver to specify a driver explicitly.
 func Open(dsn string) (*DB, error) {
@@ -54,6 +64,30 @@ func Open(dsn string) (*DB, error) {
 
 // OpenWithDriver opens a database with default pooling for the given driver.
 func OpenWithDriver(driverName, dsn string) (*DB, error) {
+	if drv, ok := GetDriver(driverName); ok {
+		dc, ok := drv.(sqldriver.DriverContext)
+		if !ok {
+			return nil, fmt.Errorf("driver %q does not implement DriverContext", driverName)
+		}
+		connector, err := dc.OpenConnector(dsn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create connector: %w", err)
+		}
+		sqlDB := sql.OpenDB(connector)
+		sqlDB.SetMaxOpenConns(10)
+		sqlDB.SetMaxIdleConns(10)
+		sqlDB.SetConnMaxLifetime(time.Hour)
+		if err = sqlDB.Ping(); err != nil {
+			return nil, err
+		}
+		dialect, ok := getDialect(driverName)
+		if !ok {
+			dialect = defaultDialect(driverName)
+		}
+		d := &driver.Driver{DB: sqlDB, Dialect: dialect}
+		return &DB{drv: d, exec: sqlDB}, nil
+	}
+
 	drv, err := driver.Open(driverName, dsn, 10, 10, time.Hour)
 	if err != nil {
 		return nil, err
