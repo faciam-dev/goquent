@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/faciam-dev/goquent/orm/driver"
@@ -48,6 +49,13 @@ const (
 	Postgres = "postgres"
 )
 
+func defaultDialect(name string) driver.Dialect {
+	if strings.Contains(strings.ToLower(name), "postgres") {
+		return driver.PostgresDialect{}
+	}
+	return driver.MySQLDialect{}
+}
+
 // Open opens a MySQL database with default pooling. Deprecated: use
 // OpenWithDriver to specify a driver explicitly.
 func Open(dsn string) (*DB, error) {
@@ -72,12 +80,9 @@ func OpenWithDriver(driverName, dsn string) (*DB, error) {
 		if err = sqlDB.Ping(); err != nil {
 			return nil, err
 		}
-		var dialect driver.Dialect
-		switch driverName {
-		case Postgres:
-			dialect = driver.PostgresDialect{}
-		default:
-			dialect = driver.MySQLDialect{}
+		dialect, ok := getDialect(driverName)
+		if !ok {
+			dialect = defaultDialect(driverName)
 		}
 		d := &driver.Driver{DB: sqlDB, Dialect: dialect}
 		return &DB{drv: d, exec: sqlDB}, nil

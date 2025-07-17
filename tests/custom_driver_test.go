@@ -3,14 +3,19 @@ package tests
 import (
 	"database/sql"
 	"net"
+	"os"
 	"testing"
 
 	"github.com/faciam-dev/goquent/orm"
+	"github.com/faciam-dev/goquent/orm/driver"
 	mysql "github.com/go-sql-driver/mysql"
 )
 
 func setupCustomDB(t testing.TB, drvName string) *orm.DB {
-	dsn := "root:password@tcp(localhost:3306)/testdb?parseTime=true"
+	dsn := os.Getenv("TEST_DB_DSN")
+	if dsn == "" {
+		t.Skip("TEST_DB_DSN environment variable not set")
+	}
 	db, err := orm.OpenWithDriver(drvName, dsn)
 	if err != nil {
 		if _, ok := err.(*net.OpError); ok {
@@ -18,7 +23,10 @@ func setupCustomDB(t testing.TB, drvName string) *orm.DB {
 		}
 		t.Fatalf("open: %v", err)
 	}
-	stdDB, _ := sql.Open("mysql", dsn)
+	stdDB, err := sql.Open("mysql", dsn)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
 	_, err = stdDB.Exec(`CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(64),
@@ -40,7 +48,7 @@ func setupCustomDB(t testing.TB, drvName string) *orm.DB {
 }
 
 func TestOpenWithRegisteredDriver(t *testing.T) {
-	orm.RegisterDriver("mysql-custom", &mysql.MySQLDriver{})
+	orm.RegisterDriverWithDialect("mysql-custom", &mysql.MySQLDriver{}, driver.MySQLDialect{})
 	db := setupCustomDB(t, "mysql-custom")
 	defer db.Close()
 
