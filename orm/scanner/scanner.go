@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"unicode"
 )
 
 // Struct scans current row into dest struct using column mapping.
@@ -29,7 +30,7 @@ func Struct(dest any, rows *sql.Rows) error {
 		return err
 	}
 	for i, col := range cols {
-		f := v.FieldByNameFunc(func(name string) bool { return toSnake(name) == col })
+		f := fieldByColumn(v, col)
 		if f.IsValid() && f.CanSet() {
 			val := reflect.ValueOf(fields[i]).Elem().Interface()
 			if val != nil {
@@ -128,7 +129,7 @@ func Structs(dest any, rows *sql.Rows) error {
 		}
 		elem := reflect.New(elemType).Elem()
 		for i, col := range cols {
-			f := elem.FieldByNameFunc(func(name string) bool { return toSnake(name) == col })
+			f := fieldByColumn(elem, col)
 			if f.IsValid() && f.CanSet() {
 				val := reflect.ValueOf(fields[i]).Elem().Interface()
 				if val != nil {
@@ -147,12 +148,55 @@ func Structs(dest any, rows *sql.Rows) error {
 }
 
 func toSnake(s string) string {
-	var out []rune
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			out = append(out, '_')
+	runes := []rune(s)
+	var sb strings.Builder
+	for i, r := range runes {
+		if i > 0 {
+			prev := runes[i-1]
+			next := rune(0)
+			if i+1 < len(runes) {
+				next = runes[i+1]
+			}
+			if unicode.IsLower(prev) && unicode.IsUpper(r) {
+				sb.WriteByte('_')
+			} else if unicode.IsUpper(prev) && unicode.IsUpper(r) && next != 0 && unicode.IsLower(next) {
+				sb.WriteByte('_')
+			}
 		}
-		out = append(out, r)
+		sb.WriteRune(unicode.ToLower(r))
 	}
-	return strings.ToLower(string(out))
+	return sb.String()
+}
+
+func fieldByColumn(v reflect.Value, col string) reflect.Value {
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
+		if sf.PkgPath != "" {
+			continue
+		}
+		name := sf.Tag.Get("db")
+		if name == "" || name == "-" {
+			if tag := sf.Tag.Get("orm"); tag != "" {
+				name = parseTag(tag)
+			}
+		}
+		if name == "" {
+			name = toSnake(sf.Name)
+		}
+		if name == col {
+			return v.Field(i)
+		}
+	}
+	return reflect.Value{}
+}
+
+func parseTag(tag string) string {
+	for _, part := range strings.Split(tag, ",") {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) == 2 && kv[0] == "column" {
+			return kv[1]
+		}
+	}
+	return ""
 }

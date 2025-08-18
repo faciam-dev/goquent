@@ -70,3 +70,66 @@ func TestMapsConvertsBytes(t *testing.T) {
 		t.Fatalf("expectations: %v", err)
 	}
 }
+
+func TestStructsHandlesID(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock new: %v", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "name"}).AddRow(1, "alice")
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	r, err := db.Query("SELECT id, name FROM users")
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	defer r.Close()
+
+	var users []struct {
+		ID   int64
+		Name string
+	}
+	if err := scanner.Structs(&users, r); err != nil {
+		t.Fatalf("scan structs: %v", err)
+	}
+	if len(users) != 1 || users[0].ID != 1 {
+		t.Errorf("unexpected users: %+v", users)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestStructsDBTag(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock new: %v", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"user_id"}).AddRow(2)
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	r, err := db.Query("SELECT user_id FROM users")
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	defer r.Close()
+
+	var users []struct {
+		ID int `db:"user_id"`
+	}
+	if err := scanner.Structs(&users, r); err != nil {
+		t.Fatalf("scan structs: %v", err)
+	}
+	if len(users) != 1 || users[0].ID != 2 {
+		t.Errorf("unexpected users: %+v", users)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"unicode"
 )
 
 // fieldInfo holds mapping metadata.
@@ -29,9 +30,10 @@ func Columns(t reflect.Type) []fieldInfo {
 	var res []fieldInfo
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-		tag := f.Tag.Get("orm")
 		col := ""
-		if tag != "" {
+		if tag := f.Tag.Get("db"); tag != "" && tag != "-" {
+			col = tag
+		} else if tag := f.Tag.Get("orm"); tag != "" {
 			parts := strings.Split(tag, ",")
 			for _, p := range parts {
 				kv := strings.SplitN(p, "=", 2)
@@ -52,14 +54,24 @@ func Columns(t reflect.Type) []fieldInfo {
 }
 
 func toSnake(s string) string {
+	runes := []rune(s)
 	var sb strings.Builder
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			sb.WriteByte('_')
+	for i, r := range runes {
+		if i > 0 {
+			prev := runes[i-1]
+			next := rune(0)
+			if i+1 < len(runes) {
+				next = runes[i+1]
+			}
+			if unicode.IsLower(prev) && unicode.IsUpper(r) {
+				sb.WriteByte('_')
+			} else if unicode.IsUpper(prev) && unicode.IsUpper(r) && next != 0 && unicode.IsLower(next) {
+				sb.WriteByte('_')
+			}
 		}
-		sb.WriteRune(r)
+		sb.WriteRune(unicode.ToLower(r))
 	}
-	return strings.ToLower(sb.String())
+	return sb.String()
 }
 
 // TableName returns default table name for struct value.
