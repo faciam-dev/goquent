@@ -55,3 +55,34 @@ func TestPostgresInsertSelect(t *testing.T) {
 		t.Errorf("expected age 10, got %v", row["age"])
 	}
 }
+
+func TestPostgresInsertGetId(t *testing.T) {
+	db := setupPgDB(t)
+	defer db.Close()
+	id, err := db.Table("users").InsertGetId(map[string]any{"name": "pg2", "age": 11})
+	if err != nil {
+		t.Fatalf("insert get id: %v", err)
+	}
+	if id != 1 {
+		t.Errorf("expected id 1, got %d", id)
+	}
+}
+
+func TestPostgresInsertGetIdCustomPrimaryKey(t *testing.T) {
+	db := setupPgDB(t)
+	defer db.Close()
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS items (
+               item_id SERIAL PRIMARY KEY,
+               name TEXT
+       )`); err != nil {
+		t.Fatalf("create table: %v", err)
+	}
+	defer db.Exec("DROP TABLE items")
+	id, err := db.Table("items").PrimaryKey("item_id").InsertGetId(map[string]any{"name": "foo"})
+	if err != nil {
+		t.Fatalf("insert get id: %v", err)
+	}
+	if id != 1 {
+		t.Errorf("expected id 1, got %d", id)
+	}
+}

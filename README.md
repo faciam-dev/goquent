@@ -38,6 +38,12 @@ newID, err := db.Table("users").InsertGetId(map[string]any{"name": "sam", "age":
 if err != nil {
     log.Fatal(err)
 }
+
+// specify a custom primary key column when needed
+altID, err := db.Table("accounts").PrimaryKey("account_id").InsertGetId(map[string]any{"name": "jane"})
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 Transactions are handled via `Transaction`:
