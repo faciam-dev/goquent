@@ -70,6 +70,7 @@ import "github.com/faciam-dev/goquent/orm/query"
   - [func \(q \*Query\) OrWhereYear\(col, cond, year string\) \*Query](<#Query.OrWhereYear>)
   - [func \(q \*Query\) OrderBy\(col, dir string\) \*Query](<#Query.OrderBy>)
   - [func \(q \*Query\) OrderByRaw\(raw string\) \*Query](<#Query.OrderByRaw>)
+  - [func \(q \*Query\) PrimaryKey\(col string\) \*Query](<#Query.PrimaryKey>)
   - [func \(q \*Query\) RawSQL\(\) \(string, error\)](<#Query.RawSQL>)
   - [func \(q \*Query\) ReOrder\(\) \*Query](<#Query.ReOrder>)
   - [func \(q \*Query\) RightJoin\(table, localColumn, cond, target string\) \*Query](<#Query.RightJoin>)
@@ -288,7 +289,7 @@ InsertBatch executes a bulk INSERT with the given slice of data maps.
 func (q *Query) InsertGetId(data map[string]any) (int64, error)
 ```
 
-InsertGetId executes an INSERT and returns the auto\-increment ID.
+InsertGetId executes an INSERT and returns the auto\-increment ID. For PostgreSQL, it appends a RETURNING clause for the configured primary key column because the driver does not support LastInsertId.
 
 <a name="Query.InsertOrIgnore"></a>
 ### func \(\*Query\) InsertOrIgnore
@@ -676,6 +677,15 @@ func (q *Query) OrderByRaw(raw string) *Query
 ```
 
 OrderByRaw adds raw ORDER BY clause.
+
+<a name="Query.PrimaryKey"></a>
+### func \(\*Query\) PrimaryKey
+
+```go
+func (q *Query) PrimaryKey(col string) *Query
+```
+
+PrimaryKey sets the primary key column for the table.
 
 <a name="Query.RawSQL"></a>
 ### func \(\*Query\) RawSQL
