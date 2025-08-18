@@ -289,7 +289,7 @@ InsertBatch executes a bulk INSERT with the given slice of data maps.
 func (q *Query) InsertGetId(data map[string]any) (int64, error)
 ```
 
-InsertGetId executes an INSERT and returns the auto\-increment ID.
+InsertGetId executes an INSERT and returns the auto\-increment ID. When using PostgreSQL, it appends a `RETURNING id` clause to retrieve the inserted identifier because the driver does not implement `LastInsertId`.
 
 <a name="Query.InsertOrIgnore"></a>
 ### func \(\*Query\) InsertOrIgnore

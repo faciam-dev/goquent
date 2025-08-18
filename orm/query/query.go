@@ -104,6 +104,13 @@ func (q *Query) queryRows(sqlStr string, args ...any) (*sql.Rows, error) {
 	return q.exec.Query(sqlStr, args...)
 }
 
+func (q *Query) queryRow(sqlStr string, args ...any) *sql.Row {
+	if q.ctx != nil {
+		return q.exec.QueryRowContext(q.ctx, sqlStr, args...)
+	}
+	return q.exec.QueryRow(sqlStr, args...)
+}
+
 // execStmt executes Exec or ExecContext depending on ctx.
 func (q *Query) execStmt(sqlStr string, args ...any) (sql.Result, error) {
 	if q.ctx != nil {
@@ -836,6 +843,21 @@ func (q *Query) Insert(data map[string]any) (sql.Result, error) {
 
 // InsertGetId executes an INSERT and returns the auto-increment ID.
 func (q *Query) InsertGetId(data map[string]any) (int64, error) {
+	if _, ok := q.dialect.(driver.PostgresDialect); ok {
+		ib := newInsertBuilder(q.dialect)
+		ib.Table(q.builder.GetQuery().Table.Name).Insert(data)
+		sqlStr, args, err := ib.Build()
+		if err != nil {
+			return 0, err
+		}
+		sqlStr += " RETURNING " + q.dialect.QuoteIdent("id")
+		var id int64
+		if err := q.queryRow(sqlStr, args...).Scan(&id); err != nil {
+			return 0, err
+		}
+		return id, nil
+	}
+
 	res, err := q.Insert(data)
 	if err != nil {
 		return 0, err
