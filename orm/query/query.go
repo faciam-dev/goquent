@@ -33,18 +33,19 @@ type executor interface {
 
 // Query wraps goquent QueryBuilder and the executor.
 type Query struct {
-	builder *qbapi.SelectQueryBuilder
-	exec    executor
-	ctx     context.Context
-	err     error
-	dialect driver.Dialect
+	builder    *qbapi.SelectQueryBuilder
+	exec       executor
+	ctx        context.Context
+	err        error
+	dialect    driver.Dialect
+	primaryKey string
 }
 
 // New creates a Query with given db and table.
 func New(exec executor, table string, dialect driver.Dialect) *Query {
 	builder := newSelectBuilder(dialect)
 	builder.Table(table)
-	return &Query{builder: builder, exec: exec, dialect: dialect}
+	return &Query{builder: builder, exec: exec, dialect: dialect, primaryKey: "id"}
 }
 
 func builderByDialect[T any](d driver.Dialect, mysqlFn, pgFn func() T) T {
@@ -90,6 +91,19 @@ func newDeleteBuilder(d driver.Dialect) *qbapi.DeleteQueryBuilder {
 	)
 }
 
+// PrimaryKey sets the primary key column for the table.
+func (q *Query) PrimaryKey(col string) *Query {
+	q.primaryKey = col
+	return q
+}
+
+func (q *Query) getPrimaryKeyColumn() string {
+	if q.primaryKey != "" {
+		return q.primaryKey
+	}
+	return "id"
+}
+
 // WithContext sets ctx on the query for context-aware execution.
 func (q *Query) WithContext(ctx context.Context) *Query {
 	q.ctx = ctx
@@ -102,6 +116,13 @@ func (q *Query) queryRows(sqlStr string, args ...any) (*sql.Rows, error) {
 		return q.exec.QueryContext(q.ctx, sqlStr, args...)
 	}
 	return q.exec.Query(sqlStr, args...)
+}
+
+func (q *Query) queryRow(sqlStr string, args ...any) *sql.Row {
+	if q.ctx != nil {
+		return q.exec.QueryRowContext(q.ctx, sqlStr, args...)
+	}
+	return q.exec.QueryRow(sqlStr, args...)
 }
 
 // execStmt executes Exec or ExecContext depending on ctx.
@@ -835,7 +856,24 @@ func (q *Query) Insert(data map[string]any) (sql.Result, error) {
 }
 
 // InsertGetId executes an INSERT and returns the auto-increment ID.
+// For PostgreSQL, it appends a RETURNING clause for the configured
+// primary key column because the driver does not support LastInsertId.
 func (q *Query) InsertGetId(data map[string]any) (int64, error) {
+	if _, ok := q.dialect.(driver.PostgresDialect); ok {
+		ib := newInsertBuilder(q.dialect)
+		ib.Table(q.builder.GetQuery().Table.Name).Insert(data)
+		sqlStr, args, err := ib.Build()
+		if err != nil {
+			return 0, err
+		}
+		sqlStr += " RETURNING " + q.dialect.QuoteIdent(q.getPrimaryKeyColumn())
+		var id int64
+		if err := q.queryRow(sqlStr, args...).Scan(&id); err != nil {
+			return 0, err
+		}
+		return id, nil
+	}
+
 	res, err := q.Insert(data)
 	if err != nil {
 		return 0, err

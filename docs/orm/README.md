@@ -9,6 +9,10 @@ import "github.com/faciam-dev/goquent/orm"
 ## Index
 
 - [Constants](<#constants>)
+- [func GetDriver\(name string\) \(sqldriver.Driver, bool\)](<#GetDriver>)
+- [func RegisterDialect\(name string, d driver.Dialect\)](<#RegisterDialect>)
+- [func RegisterDriver\(name string, d sqldriver.Driver\)](<#RegisterDriver>)
+- [func RegisterDriverWithDialect\(name string, d sqldriver.Driver, dialect driver.Dialect\)](<#RegisterDriverWithDialect>)
 - [type DB](<#DB>)
   - [func Open\(dsn string\) \(\*DB, error\)](<#Open>)
   - [func OpenWithDriver\(driverName, dsn string\) \(\*DB, error\)](<#OpenWithDriver>)
@@ -39,6 +43,42 @@ const (
     Postgres = "postgres"
 )
 ```
+
+<a name="GetDriver"></a>
+## func GetDriver
+
+```go
+func GetDriver(name string) (sqldriver.Driver, bool)
+```
+
+GetDriver retrieves a registered driver.
+
+<a name="RegisterDialect"></a>
+## func RegisterDialect
+
+```go
+func RegisterDialect(name string, d driver.Dialect)
+```
+
+RegisterDialect registers a SQL dialect for a driver name.
+
+<a name="RegisterDriver"></a>
+## func RegisterDriver
+
+```go
+func RegisterDriver(name string, d sqldriver.Driver)
+```
+
+RegisterDriver registers a database driver.
+
+<a name="RegisterDriverWithDialect"></a>
+## func RegisterDriverWithDialect
+
+```go
+func RegisterDriverWithDialect(name string, d sqldriver.Driver, dialect driver.Dialect)
+```
+
+RegisterDriverWithDialect registers a database driver along with its dialect.
 
 <a name="DB"></a>
 ## type DB

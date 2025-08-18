@@ -33,8 +33,14 @@ err = db.Table("users").Where("age", ">", 20).GetMaps(&rows)
 var users []User
 err = db.Model(&User{}).Where("age", ">", 20).Get(&users)
 
-// insert a record and get its auto-increment id
+// insert a record and get its auto-increment id (uses RETURNING on PostgreSQL)
 newID, err := db.Table("users").InsertGetId(map[string]any{"name": "sam", "age": 18})
+if err != nil {
+    log.Fatal(err)
+}
+
+// specify a custom primary key column when needed
+altID, err := db.Table("accounts").PrimaryKey("account_id").InsertGetId(map[string]any{"name": "jane"})
 if err != nil {
     log.Fatal(err)
 }
