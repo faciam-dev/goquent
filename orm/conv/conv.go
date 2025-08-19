@@ -90,6 +90,51 @@ func MapsToStructs(src []map[string]any, dest any) error {
 	return nil
 }
 
+// StructToMap converts a struct or pointer to struct into a map. Column names
+// are determined by `db` or `orm` tags, falling back to snake_case field names.
+// Fields tagged with `db:"-"` are omitted. Zero-value fields are included
+// unless the tag contains `omitempty`.
+func StructToMap(v any) (map[string]any, error) {
+	if v == nil {
+		return nil, fmt.Errorf("value is nil")
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("StructToMap expects struct input")
+	}
+	t := rv.Type()
+	m := make(map[string]any, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
+		if sf.PkgPath != "" { // unexported field
+			continue
+		}
+		dbTag := sf.Tag.Get("db")
+		col, _ := splitTag(dbTag)
+		if col == "-" {
+			continue
+		}
+		tag := dbTag
+		if col == "" {
+			ormTag := sf.Tag.Get("orm")
+			tag = ormTag
+			col = parseTag(ormTag)
+		}
+		if col == "" {
+			col = stringutil.ToSnake(sf.Name)
+		}
+		fv := rv.Field(i)
+		if hasOmitempty(tag) && fv.IsZero() {
+			continue
+		}
+		m[col] = fv.Interface()
+	}
+	return m, nil
+}
+
 func findValue(m map[string]any, name string) (any, bool) {
 	if val, ok := m[name]; ok {
 		return val, true
@@ -117,4 +162,26 @@ func parseTag(tag string) string {
 		}
 	}
 	return ""
+}
+
+func splitTag(tag string) (name string, opts []string) {
+	parts := strings.Split(tag, ",")
+	if len(parts) == 0 {
+		return "", nil
+	}
+	name = parts[0]
+	if len(parts) > 1 {
+		opts = parts[1:]
+	}
+	return name, opts
+}
+
+func hasOmitempty(tag string) bool {
+	_, opts := splitTag(tag)
+	for _, o := range opts {
+		if o == "omitempty" {
+			return true
+		}
+	}
+	return false
 }

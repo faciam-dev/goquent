@@ -10,6 +10,7 @@ import (
 	qbapi "github.com/faciam-dev/goquent-query-builder/api"
 	qbmysql "github.com/faciam-dev/goquent-query-builder/database/mysql"
 	qbpostgres "github.com/faciam-dev/goquent-query-builder/database/postgres"
+	"github.com/faciam-dev/goquent/orm/conv"
 	"github.com/faciam-dev/goquent/orm/driver"
 	"github.com/faciam-dev/goquent/orm/scanner"
 )
@@ -844,10 +845,21 @@ func (q *Query) Dump() (string, []any, error) { return q.builder.Dump() }
 // RawSQL returns interpolated SQL for debugging.
 func (q *Query) RawSQL() (string, error) { return q.builder.RawSql() }
 
+func dataToMap(data any) (map[string]any, error) {
+	if m, ok := data.(map[string]any); ok {
+		return m, nil
+	}
+	return conv.StructToMap(data)
+}
+
 // Insert executes an INSERT with the given data.
-func (q *Query) Insert(data map[string]any) (sql.Result, error) {
+func (q *Query) Insert(data any) (sql.Result, error) {
+	m, err := dataToMap(data)
+	if err != nil {
+		return nil, err
+	}
 	ib := newInsertBuilder(q.dialect)
-	ib.Table(q.builder.GetQuery().Table.Name).Insert(data)
+	ib.Table(q.builder.GetQuery().Table.Name).Insert(m)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
 		return nil, err
@@ -858,10 +870,14 @@ func (q *Query) Insert(data map[string]any) (sql.Result, error) {
 // InsertGetId executes an INSERT and returns the auto-increment ID.
 // For PostgreSQL, it appends a RETURNING clause for the configured
 // primary key column because the driver does not support LastInsertId.
-func (q *Query) InsertGetId(data map[string]any) (int64, error) {
+func (q *Query) InsertGetId(data any) (int64, error) {
+	m, err := dataToMap(data)
+	if err != nil {
+		return 0, err
+	}
 	if _, ok := q.dialect.(driver.PostgresDialect); ok {
 		ib := newInsertBuilder(q.dialect)
-		ib.Table(q.builder.GetQuery().Table.Name).Insert(data)
+		ib.Table(q.builder.GetQuery().Table.Name).Insert(m)
 		sqlStr, args, err := ib.Build()
 		if err != nil {
 			return 0, err
@@ -874,7 +890,7 @@ func (q *Query) InsertGetId(data map[string]any) (int64, error) {
 		return id, nil
 	}
 
-	res, err := q.Insert(data)
+	res, err := q.Insert(m)
 	if err != nil {
 		return 0, err
 	}
@@ -941,9 +957,13 @@ func (q *Query) InsertUsing(columns []string, sub *Query) (sql.Result, error) {
 }
 
 // Update executes an UPDATE with the given data.
-func (q *Query) Update(data map[string]any) (sql.Result, error) {
+func (q *Query) Update(data any) (sql.Result, error) {
+	m, err := dataToMap(data)
+	if err != nil {
+		return nil, err
+	}
 	ub := newUpdateBuilder(q.dialect)
-	ub.Table(q.builder.GetQuery().Table.Name).Update(data)
+	ub.Table(q.builder.GetQuery().Table.Name).Update(m)
 	copyBuilderState(q.builder, ub)
 	sqlStr, args, err := ub.Build()
 	if err != nil {

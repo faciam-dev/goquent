@@ -113,3 +113,24 @@ func TestMapToStructDBTag(t *testing.T) {
 		t.Errorf("unexpected user: %+v", u)
 	}
 }
+
+func TestStructToMapOmitempty(t *testing.T) {
+	type user struct {
+		Age   int  `db:"age"`
+		Flag  bool `db:"flag,omitempty"`
+		Score int
+	}
+	m, err := conv.StructToMap(user{})
+	if err != nil {
+		t.Fatalf("struct to map: %v", err)
+	}
+	if v, ok := m["age"]; !ok || v != 0 {
+		t.Errorf("expected age 0, got %v", v)
+	}
+	if _, ok := m["flag"]; ok {
+		t.Error("flag should be omitted")
+	}
+	if v, ok := m["score"]; !ok || v != 0 {
+		t.Errorf("expected score 0, got %v", v)
+	}
+}
