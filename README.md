@@ -38,6 +38,7 @@ newID, err := db.Table("users").InsertGetId(User{Name: "sam", Age: 18})
 if err != nil {
     log.Fatal(err)
 }
+// zero-value fields are inserted unless tagged with `omitempty`
 
 // specify a custom primary key column when needed
 altID, err := db.Table("accounts").PrimaryKey("account_id").InsertGetId(map[string]any{"name": "jane"})
