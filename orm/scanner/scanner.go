@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"unicode"
+
+	"github.com/faciam-dev/goquent/orm/internal/stringutil"
 )
 
 // Struct scans current row into dest struct using column mapping.
@@ -147,27 +148,6 @@ func Structs(dest any, rows *sql.Rows) error {
 	return rows.Err()
 }
 
-func toSnake(s string) string {
-	runes := []rune(s)
-	var sb strings.Builder
-	for i, r := range runes {
-		if i > 0 {
-			prev := runes[i-1]
-			next := rune(0)
-			if i+1 < len(runes) {
-				next = runes[i+1]
-			}
-			if unicode.IsLower(prev) && unicode.IsUpper(r) {
-				sb.WriteByte('_')
-			} else if unicode.IsUpper(prev) && unicode.IsUpper(r) && next != 0 && unicode.IsLower(next) {
-				sb.WriteByte('_')
-			}
-		}
-		sb.WriteRune(unicode.ToLower(r))
-	}
-	return sb.String()
-}
-
 func fieldByColumn(v reflect.Value, col string) reflect.Value {
 	t := v.Type()
 	for i := 0; i < t.NumField(); i++ {
@@ -182,7 +162,7 @@ func fieldByColumn(v reflect.Value, col string) reflect.Value {
 			}
 		}
 		if name == "" {
-			name = toSnake(sf.Name)
+			name = stringutil.ToSnake(sf.Name)
 		}
 		if name == col {
 			return v.Field(i)

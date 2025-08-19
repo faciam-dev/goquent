@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"unicode"
+
+	"github.com/faciam-dev/goquent/orm/internal/stringutil"
 )
 
 // As converts v to the desired type T using reflection.
@@ -53,7 +54,7 @@ func MapToStruct(m map[string]any, dest any) error {
 			col = parseTag(sf.Tag.Get("orm"))
 		}
 		if col == "" {
-			col = toSnake(sf.Name)
+			col = stringutil.ToSnake(sf.Name)
 		}
 		if val, ok := findValue(m, col); ok && val != nil {
 			fv := reflect.ValueOf(val)
@@ -116,25 +117,4 @@ func parseTag(tag string) string {
 		}
 	}
 	return ""
-}
-
-func toSnake(s string) string {
-	runes := []rune(s)
-	var sb strings.Builder
-	for i, r := range runes {
-		if i > 0 {
-			prev := runes[i-1]
-			next := rune(0)
-			if i+1 < len(runes) {
-				next = runes[i+1]
-			}
-			if unicode.IsLower(prev) && unicode.IsUpper(r) {
-				sb.WriteByte('_')
-			} else if unicode.IsUpper(prev) && unicode.IsUpper(r) && next != 0 && unicode.IsLower(next) {
-				sb.WriteByte('_')
-			}
-		}
-		sb.WriteRune(unicode.ToLower(r))
-	}
-	return sb.String()
 }

@@ -4,7 +4,8 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"unicode"
+
+	"github.com/faciam-dev/goquent/orm/internal/stringutil"
 )
 
 // fieldInfo holds mapping metadata.
@@ -43,7 +44,7 @@ func Columns(t reflect.Type) []fieldInfo {
 			}
 		}
 		if col == "" {
-			col = toSnake(f.Name)
+			col = stringutil.ToSnake(f.Name)
 		}
 		res = append(res, fieldInfo{name: col, index: f.Index})
 	}
@@ -51,27 +52,6 @@ func Columns(t reflect.Type) []fieldInfo {
 	defer cache.Unlock()
 	cache.m[t] = res
 	return res
-}
-
-func toSnake(s string) string {
-	runes := []rune(s)
-	var sb strings.Builder
-	for i, r := range runes {
-		if i > 0 {
-			prev := runes[i-1]
-			next := rune(0)
-			if i+1 < len(runes) {
-				next = runes[i+1]
-			}
-			if unicode.IsLower(prev) && unicode.IsUpper(r) {
-				sb.WriteByte('_')
-			} else if unicode.IsUpper(prev) && unicode.IsUpper(r) && next != 0 && unicode.IsLower(next) {
-				sb.WriteByte('_')
-			}
-		}
-		sb.WriteRune(unicode.ToLower(r))
-	}
-	return sb.String()
 }
 
 // TableName returns default table name for struct value.
@@ -83,5 +63,5 @@ func TableName(v any) string {
 		return tn.TableName()
 	}
 	t := reflect.Indirect(reflect.ValueOf(v)).Type()
-	return toSnake(t.Name()) + "s"
+	return stringutil.ToSnake(t.Name()) + "s"
 }
