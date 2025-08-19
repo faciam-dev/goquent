@@ -152,3 +152,20 @@ func TestUpsertMap(t *testing.T) {
 		t.Errorf("expected mapnew, got %s", name)
 	}
 }
+
+func TestUpsertStructNoUpdate(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	ctx := context.Background()
+	u := User{ID: 2}
+	if _, err := orm.Upsert(ctx, db, u, orm.WherePK()); err != nil {
+		t.Fatalf("upsert no update: %v", err)
+	}
+	var name string
+	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = 2").Scan(&name); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if name != "bob" {
+		t.Errorf("expected bob, got %s", name)
+	}
+}

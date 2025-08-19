@@ -103,7 +103,7 @@ func Insert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 	var cols []string
 	var args []any
 
-	if isMapStringAny(typ) {
+	if isMapStringInterface(typ) {
 		if o.table == "" {
 			return nil, fmt.Errorf("Table option required for map writes")
 		}
@@ -189,7 +189,7 @@ func Update[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 	var whereParts []string
 	var args []any
 
-	if isMapStringAny(typ) {
+	if isMapStringInterface(typ) {
 		if o.table == "" {
 			return nil, fmt.Errorf("Table option required for map writes")
 		}
@@ -295,7 +295,7 @@ func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 	var pkCols []string
 	var updateCols []string
 
-	if isMapStringAny(typ) {
+	if isMapStringInterface(typ) {
 		if o.table == "" {
 			return nil, fmt.Errorf("Table option required for map writes")
 		}
@@ -396,17 +396,23 @@ func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 				assigns[i] = fmt.Sprintf("%s=VALUES(%s)", quote(db.drv.Dialect, c), quote(db.drv.Dialect, c))
 			}
 			sqlStr += " ON DUPLICATE KEY UPDATE " + strings.Join(assigns, ", ")
+		} else {
+			sqlStr = strings.Replace(sqlStr, "INSERT", "INSERT IGNORE", 1)
 		}
 	case driver.PostgresDialect:
 		quotedPK := make([]string, len(pkCols))
 		for i, c := range pkCols {
 			quotedPK[i] = quote(db.drv.Dialect, c)
 		}
-		assigns := make([]string, len(updateCols))
-		for i, c := range updateCols {
-			assigns[i] = fmt.Sprintf("%s=EXCLUDED.%s", quote(db.drv.Dialect, c), quote(db.drv.Dialect, c))
+		if len(updateCols) > 0 {
+			assigns := make([]string, len(updateCols))
+			for i, c := range updateCols {
+				assigns[i] = fmt.Sprintf("%s=EXCLUDED.%s", quote(db.drv.Dialect, c), quote(db.drv.Dialect, c))
+			}
+			sqlStr += fmt.Sprintf(" ON CONFLICT (%s) DO UPDATE SET %s", strings.Join(quotedPK, ", "), strings.Join(assigns, ", "))
+		} else {
+			sqlStr += fmt.Sprintf(" ON CONFLICT (%s) DO NOTHING", strings.Join(quotedPK, ", "))
 		}
-		sqlStr += fmt.Sprintf(" ON CONFLICT (%s) DO UPDATE SET %s", strings.Join(quotedPK, ", "), strings.Join(assigns, ", "))
 	default:
 		return nil, fmt.Errorf("upsert not supported on dialect: %T", db.drv.Dialect)
 	}

@@ -19,7 +19,7 @@ func SelectOne[T any](ctx context.Context, db *DB, q string, args ...any) (T, er
 	var t T
 	typ := reflect.TypeOf(t)
 	switch {
-	case isMapStringAny(typ):
+	case isMapStringInterface(typ):
 		cols, err := rows.Columns()
 		if err != nil {
 			return zero, err
@@ -125,7 +125,7 @@ func SelectAll[T any](ctx context.Context, db *DB, q string, args ...any) ([]T, 
 	var t T
 	typ := reflect.TypeOf(t)
 	switch {
-	case isMapStringAny(typ):
+	case isMapStringInterface(typ):
 		cols, err := rows.Columns()
 		if err != nil {
 			return nil, err
@@ -216,6 +216,7 @@ func SelectAll[T any](ctx context.Context, db *DB, q string, args ...any) ([]T, 
 	}
 }
 
-func isMapStringAny(t reflect.Type) bool {
+// isMapStringInterface checks if t is map[string]interface{} where the interface has zero methods.
+func isMapStringInterface(t reflect.Type) bool {
 	return t.Kind() == reflect.Map && t.Key().Kind() == reflect.String && t.Elem().Kind() == reflect.Interface && t.Elem().NumMethod() == 0
 }
