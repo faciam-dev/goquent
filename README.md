@@ -22,6 +22,7 @@ rows, _ := orm.SelectAll[map[string]any](ctx, db, "SELECT * FROM users")
 
 _, _ = orm.Insert(ctx, db, User{Name: "sam", Age: 18})
 _, _ = orm.Update(ctx, db, User{ID: 1, Name: "Alice"}, orm.Columns("name"), orm.WherePK())
+_, _ = orm.Update(ctx, db, map[string]any{"id": 1, "name": "Bob"}, orm.Table("users"), orm.PK("id"), orm.WherePK())
 user := new(User)
 err := db.Model(user).Where("id", 1).First(user)
 

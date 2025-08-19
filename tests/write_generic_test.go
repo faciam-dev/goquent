@@ -96,3 +96,59 @@ func TestUpsertStruct(t *testing.T) {
 		t.Errorf("expected newg, got %s", name)
 	}
 }
+
+func TestUpdateMapWherePK(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	ctx := context.Background()
+	m := map[string]any{"id": 1, "name": "alice4"}
+	if _, err := orm.Update(ctx, db, m, orm.Table("users"), orm.PK("id"), orm.Columns("name"), orm.WherePK()); err != nil {
+		t.Fatalf("update map: %v", err)
+	}
+	var name string
+	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = 1").Scan(&name); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if name != "alice4" {
+		t.Errorf("expected alice4, got %s", name)
+	}
+}
+
+func TestUpdateMapMissingPKOpt(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	ctx := context.Background()
+	m := map[string]any{"id": 1, "name": "alice5"}
+	if _, err := orm.Update(ctx, db, m, orm.Table("users"), orm.WherePK()); err == nil {
+		t.Fatalf("expected error without PK option")
+	}
+}
+
+func TestUpsertMap(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	ctx := context.Background()
+	// update existing
+	m := map[string]any{"id": 2, "name": "bob3"}
+	if _, err := orm.Upsert(ctx, db, m, orm.Table("users"), orm.PK("id"), orm.WherePK()); err != nil {
+		t.Fatalf("upsert update: %v", err)
+	}
+	var name string
+	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = 2").Scan(&name); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if name != "bob3" {
+		t.Errorf("expected bob3, got %s", name)
+	}
+	// insert new
+	m2 := map[string]any{"id": 11, "name": "mapnew"}
+	if _, err := orm.Upsert(ctx, db, m2, orm.Table("users"), orm.PK("id"), orm.WherePK()); err != nil {
+		t.Fatalf("upsert insert: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = 11").Scan(&name); err != nil {
+		t.Fatalf("select2: %v", err)
+	}
+	if name != "mapnew" {
+		t.Errorf("expected mapnew, got %s", name)
+	}
+}

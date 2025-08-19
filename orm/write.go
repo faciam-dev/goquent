@@ -20,6 +20,7 @@ type writeOptions struct {
 	wherePK   bool
 	returning []string
 	table     string
+	pkCols    map[string]struct{}
 }
 
 // Columns limits write to specified columns.
@@ -55,12 +56,32 @@ func Returning(cols ...string) WriteOpt { return func(o *writeOptions) { o.retur
 // Table sets table name (required for map writes).
 func Table(name string) WriteOpt { return func(o *writeOptions) { o.table = name } }
 
+// PK specifies primary key columns for map writes.
+func PK(cols ...string) WriteOpt {
+	return func(o *writeOptions) {
+		if o.pkCols == nil {
+			o.pkCols = make(map[string]struct{}, len(cols))
+		}
+		for _, c := range cols {
+			o.pkCols[c] = struct{}{}
+		}
+	}
+}
+
 func applyWriteOpts(opts []WriteOpt) *writeOptions {
 	o := &writeOptions{}
 	for _, opt := range opts {
 		opt(o)
 	}
 	return o
+}
+
+func (o *writeOptions) isPK(col string) bool {
+	if o.pkCols == nil {
+		return false
+	}
+	_, ok := o.pkCols[col]
+	return ok
 }
 
 func quote(d driver.Dialect, ident string) string { return d.QuoteIdent(ident) }
@@ -172,12 +193,17 @@ func Update[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 		if o.table == "" {
 			return nil, fmt.Errorf("Table option required for map writes")
 		}
+		if len(o.pkCols) == 0 {
+			return nil, fmt.Errorf("WherePK for map writes requires PK columns via PK option")
+		}
 		table = o.table
 		iter := val.MapRange()
+		seen := make(map[string]bool)
 		for iter.Next() {
 			col := iter.Key().String()
 			v := iter.Value()
-			if col == "id" { // treat id as PK
+			seen[col] = true
+			if o.isPK(col) {
 				whereParts = append(whereParts, fmt.Sprintf("%s=%s", quote(db.drv.Dialect, col), db.drv.Dialect.Placeholder(len(args)+1)))
 				args = append(args, v.Interface())
 				continue
@@ -192,6 +218,11 @@ func Update[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 			}
 			setParts = append(setParts, fmt.Sprintf("%s=%s", quote(db.drv.Dialect, col), db.drv.Dialect.Placeholder(len(args)+1)))
 			args = append(args, v.Interface())
+		}
+		for pk := range o.pkCols {
+			if !seen[pk] {
+				return nil, fmt.Errorf("WherePK requires pk column %s", pk)
+			}
 		}
 	} else if typ.Kind() == reflect.Struct {
 		table = o.table
@@ -268,12 +299,17 @@ func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 		if o.table == "" {
 			return nil, fmt.Errorf("Table option required for map writes")
 		}
+		if len(o.pkCols) == 0 {
+			return nil, fmt.Errorf("WherePK for map writes requires PK columns via PK option")
+		}
 		table = o.table
 		iter := val.MapRange()
+		seen := make(map[string]bool)
 		for iter.Next() {
 			col := iter.Key().String()
 			fv := iter.Value().Interface()
-			if col == "id" {
+			seen[col] = true
+			if o.isPK(col) {
 				pkCols = append(pkCols, col)
 			}
 			if len(o.cols) > 0 {
@@ -287,8 +323,13 @@ func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 			cols = append(cols, col)
 			args = append(args, fv)
 		}
+		for pk := range o.pkCols {
+			if !seen[pk] {
+				return nil, fmt.Errorf("WherePK requires pk column %s", pk)
+			}
+		}
 		for _, c := range cols {
-			if c != "id" {
+			if !o.isPK(c) {
 				updateCols = append(updateCols, c)
 			}
 		}
