@@ -24,9 +24,9 @@ import "github.com/faciam-dev/goquent/orm/query"
   - [func \(q \*Query\) GroupBy\(cols ...string\) \*Query](<#Query.GroupBy>)
   - [func \(q \*Query\) Having\(col, cond string, val any\) \*Query](<#Query.Having>)
   - [func \(q \*Query\) HavingRaw\(raw string\) \*Query](<#Query.HavingRaw>)
-  - [func \(q \*Query\) Insert\(data map\[string\]any\) \(sql.Result, error\)](<#Query.Insert>)
+  - [func \(q \*Query\) Insert\(data any\) \(sql.Result, error\)](<#Query.Insert>)
   - [func \(q \*Query\) InsertBatch\(data \[\]map\[string\]any\) \(sql.Result, error\)](<#Query.InsertBatch>)
-  - [func \(q \*Query\) InsertGetId\(data map\[string\]any\) \(int64, error\)](<#Query.InsertGetId>)
+  - [func \(q \*Query\) InsertGetId\(data any\) \(int64, error\)](<#Query.InsertGetId>)
   - [func \(q \*Query\) InsertOrIgnore\(data \[\]map\[string\]any\) \(sql.Result, error\)](<#Query.InsertOrIgnore>)
   - [func \(q \*Query\) InsertUsing\(columns \[\]string, sub \*Query\) \(sql.Result, error\)](<#Query.InsertUsing>)
   - [func \(q \*Query\) Join\(table, localColumn, cond, target string\) \*Query](<#Query.Join>)
@@ -86,7 +86,7 @@ import "github.com/faciam-dev/goquent/orm/query"
   - [func \(q \*Query\) Take\(n int\) \*Query](<#Query.Take>)
   - [func \(q \*Query\) Union\(sub \*Query\) \*Query](<#Query.Union>)
   - [func \(q \*Query\) UnionAll\(sub \*Query\) \*Query](<#Query.UnionAll>)
-  - [func \(q \*Query\) Update\(data map\[string\]any\) \(sql.Result, error\)](<#Query.Update>)
+  - [func \(q \*Query\) Update\(data any\) \(sql.Result, error\)](<#Query.Update>)
   - [func \(q \*Query\) UpdateOrInsert\(cond map\[string\]any, values map\[string\]any\) \(sql.Result, error\)](<#Query.UpdateOrInsert>)
   - [func \(q \*Query\) Upsert\(data \[\]map\[string\]any, unique \[\]string, updateCols \[\]string\) \(sql.Result, error\)](<#Query.Upsert>)
   - [func \(q \*Query\) Where\(col string, args ...any\) \*Query](<#Query.Where>)
@@ -268,7 +268,7 @@ HavingRaw adds raw HAVING condition.
 ### func \(\*Query\) Insert
 
 ```go
-func (q *Query) Insert(data map[string]any) (sql.Result, error)
+func (q *Query) Insert(data any) (sql.Result, error)
 ```
 
 Insert executes an INSERT with the given data.
@@ -286,7 +286,7 @@ InsertBatch executes a bulk INSERT with the given slice of data maps.
 ### func \(\*Query\) InsertGetId
 
 ```go
-func (q *Query) InsertGetId(data map[string]any) (int64, error)
+func (q *Query) InsertGetId(data any) (int64, error)
 ```
 
 InsertGetId executes an INSERT and returns the auto\-increment ID. For PostgreSQL, it appends a RETURNING clause for the configured primary key column because the driver does not support LastInsertId.
@@ -826,7 +826,7 @@ UnionAll adds a UNION ALL with another query.
 ### func \(\*Query\) Update
 
 ```go
-func (q *Query) Update(data map[string]any) (sql.Result, error)
+func (q *Query) Update(data any) (sql.Result, error)
 ```
 
 Update executes an UPDATE with the given data.
