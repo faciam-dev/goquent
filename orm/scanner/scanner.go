@@ -30,16 +30,25 @@ func Struct(dest any, rows *sql.Rows) error {
 	if err = rows.Scan(fields...); err != nil {
 		return err
 	}
+	scannerType := reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 	for i, col := range cols {
 		f := fieldByColumn(v, col)
 		if f.IsValid() && f.CanSet() {
 			val := reflect.ValueOf(fields[i]).Elem().Interface()
 			if val != nil {
-				fv := reflect.ValueOf(val)
-				if fv.Type().ConvertibleTo(f.Type()) {
-					f.Set(fv.Convert(f.Type()))
+				if reflect.PointerTo(f.Type()).Implements(scannerType) {
+					inst := reflect.New(f.Type())
+					if err := inst.Interface().(sql.Scanner).Scan(val); err != nil {
+						return fmt.Errorf("scan %s: %w", col, err)
+					}
+					f.Set(inst.Elem())
 				} else {
-					return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
+					fv := reflect.ValueOf(val)
+					if fv.Type().ConvertibleTo(f.Type()) {
+						f.Set(fv.Convert(f.Type()))
+					} else {
+						return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
+					}
 				}
 			}
 		}
@@ -120,6 +129,7 @@ func Structs(dest any, rows *sql.Rows) error {
 		return fmt.Errorf("dest must point to slice")
 	}
 	elemType := v.Type().Elem()
+	scannerType := reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 	for rows.Next() {
 		fields := make([]any, len(cols))
 		for i := range fields {
@@ -134,11 +144,19 @@ func Structs(dest any, rows *sql.Rows) error {
 			if f.IsValid() && f.CanSet() {
 				val := reflect.ValueOf(fields[i]).Elem().Interface()
 				if val != nil {
-					fv := reflect.ValueOf(val)
-					if fv.Type().ConvertibleTo(f.Type()) {
-						f.Set(fv.Convert(f.Type()))
+					if reflect.PointerTo(f.Type()).Implements(scannerType) {
+						inst := reflect.New(f.Type())
+						if err := inst.Interface().(sql.Scanner).Scan(val); err != nil {
+							return fmt.Errorf("scan %s: %w", col, err)
+						}
+						f.Set(inst.Elem())
 					} else {
-						return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
+						fv := reflect.ValueOf(val)
+						if fv.Type().ConvertibleTo(f.Type()) {
+							f.Set(fv.Convert(f.Type()))
+						} else {
+							return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
+						}
 					}
 				}
 			}
