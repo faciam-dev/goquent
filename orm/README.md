@@ -10,9 +10,17 @@ import "github.com/faciam-dev/goquent/orm"
 
 - [Constants](<#constants>)
 - [func GetDriver\(name string\) \(sqldriver.Driver, bool\)](<#GetDriver>)
+- [func Insert\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Insert>)
 - [func RegisterDialect\(name string, d driver.Dialect\)](<#RegisterDialect>)
 - [func RegisterDriver\(name string, d sqldriver.Driver\)](<#RegisterDriver>)
 - [func RegisterDriverWithDialect\(name string, d sqldriver.Driver, dialect driver.Dialect\)](<#RegisterDriverWithDialect>)
+- [func ResetMetaCache\(\)](<#ResetMetaCache>)
+- [func SelectAll\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(\[\]T, error\)](<#SelectAll>)
+- [func SelectOne\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(T, error\)](<#SelectOne>)
+- [func SelectStruct\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(T, error\)](<#SelectStruct>)
+- [func SelectStructs\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(\[\]T, error\)](<#SelectStructs>)
+- [func Update\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Update>)
+- [func Upsert\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Upsert>)
 - [type DB](<#DB>)
   - [func Open\(dsn string\) \(\*DB, error\)](<#Open>)
   - [func OpenWithDriver\(driverName, dsn string\) \(\*DB, error\)](<#OpenWithDriver>)
@@ -27,10 +35,19 @@ import "github.com/faciam-dev/goquent/orm"
   - [func \(db \*DB\) QueryRow\(query string, args ...any\) \*sql.Row](<#DB.QueryRow>)
   - [func \(db \*DB\) QueryRowContext\(ctx context.Context, query string, args ...any\) \*sql.Row](<#DB.QueryRowContext>)
   - [func \(db \*DB\) SQLDB\(\) \*sql.DB](<#DB.SQLDB>)
+  - [func \(db \*DB\) SelectMap\(ctx context.Context, q string, args ...any\) \(map\[string\]any, error\)](<#DB.SelectMap>)
+  - [func \(db \*DB\) SelectMaps\(ctx context.Context, q string, args ...any\) \(\[\]map\[string\]any, error\)](<#DB.SelectMaps>)
   - [func \(db \*DB\) Table\(name string\) \*query.Query](<#DB.Table>)
   - [func \(db \*DB\) Transaction\(fn func\(tx Tx\) error\) error](<#DB.Transaction>)
   - [func \(db \*DB\) TransactionContext\(ctx context.Context, fn func\(tx Tx\) error\) error](<#DB.TransactionContext>)
 - [type Tx](<#Tx>)
+- [type WriteOpt](<#WriteOpt>)
+  - [func Columns\(cols ...string\) WriteOpt](<#Columns>)
+  - [func Omit\(cols ...string\) WriteOpt](<#Omit>)
+  - [func PK\(cols ...string\) WriteOpt](<#PK>)
+  - [func Returning\(cols ...string\) WriteOpt](<#Returning>)
+  - [func Table\(name string\) WriteOpt](<#Table>)
+  - [func WherePK\(\) WriteOpt](<#WherePK>)
 
 
 ## Constants
@@ -52,6 +69,15 @@ func GetDriver(name string) (sqldriver.Driver, bool)
 ```
 
 GetDriver retrieves a registered driver.
+
+<a name="Insert"></a>
+## func Insert
+
+```go
+func Insert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Result, error)
+```
+
+Insert inserts v into its table.
 
 <a name="RegisterDialect"></a>
 ## func RegisterDialect
@@ -79,6 +105,69 @@ func RegisterDriverWithDialect(name string, d sqldriver.Driver, dialect driver.D
 ```
 
 RegisterDriverWithDialect registers a database driver along with its dialect.
+
+<a name="ResetMetaCache"></a>
+## func ResetMetaCache
+
+```go
+func ResetMetaCache()
+```
+
+ResetMetaCache clears cached reflection metadata. Intended for tests.
+
+<a name="SelectAll"></a>
+## func SelectAll
+
+```go
+func SelectAll[T any](ctx context.Context, db *DB, q string, args ...any) ([]T, error)
+```
+
+SelectAll runs the query and scans all rows into \[\]T.
+
+<a name="SelectOne"></a>
+## func SelectOne
+
+```go
+func SelectOne[T any](ctx context.Context, db *DB, q string, args ...any) (T, error)
+```
+
+SelectOne runs the query and scans the first row into T.
+
+<a name="SelectStruct"></a>
+## func SelectStruct
+
+```go
+func SelectStruct[T any](ctx context.Context, db *DB, q string, args ...any) (T, error)
+```
+
+Deprecated: Use SelectOne instead.
+
+<a name="SelectStructs"></a>
+## func SelectStructs
+
+```go
+func SelectStructs[T any](ctx context.Context, db *DB, q string, args ...any) ([]T, error)
+```
+
+Deprecated: Use SelectAll instead.
+
+<a name="Update"></a>
+## func Update
+
+```go
+func Update[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Result, error)
+```
+
+Update updates record v.
+
+<a name="Upsert"></a>
+## func Upsert
+
+```go
+func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Result, error)
+```
+
+Upsert inserts or updates v using primary keys.
 
 <a name="DB"></a>
 ## type DB
@@ -208,6 +297,24 @@ func (db *DB) SQLDB() *sql.DB
 
 SQLDB returns the underlying \*sql.DB.
 
+<a name="DB.SelectMap"></a>
+### func \(\*DB\) SelectMap
+
+```go
+func (db *DB) SelectMap(ctx context.Context, q string, args ...any) (map[string]any, error)
+```
+
+Deprecated: Use SelectOne with map type instead.
+
+<a name="DB.SelectMaps"></a>
+### func \(\*DB\) SelectMaps
+
+```go
+func (db *DB) SelectMaps(ctx context.Context, q string, args ...any) ([]map[string]any, error)
+```
+
+Deprecated: Use SelectAll with map type instead.
+
 <a name="DB.Table"></a>
 ### func \(\*DB\) Table
 
@@ -246,5 +353,68 @@ type Tx struct {
     driver.Tx
 }
 ```
+
+<a name="WriteOpt"></a>
+## type WriteOpt
+
+WriteOpt configures write behavior.
+
+```go
+type WriteOpt func(*writeOptions)
+```
+
+<a name="Columns"></a>
+### func Columns
+
+```go
+func Columns(cols ...string) WriteOpt
+```
+
+Columns limits write to specified columns.
+
+<a name="Omit"></a>
+### func Omit
+
+```go
+func Omit(cols ...string) WriteOpt
+```
+
+Omit excludes specified columns.
+
+<a name="PK"></a>
+### func PK
+
+```go
+func PK(cols ...string) WriteOpt
+```
+
+PK specifies primary key columns for map writes.
+
+<a name="Returning"></a>
+### func Returning
+
+```go
+func Returning(cols ...string) WriteOpt
+```
+
+Returning specifies columns to return \(Postgres only\).
+
+<a name="Table"></a>
+### func Table
+
+```go
+func Table(name string) WriteOpt
+```
+
+Table sets table name \(required for map writes\).
+
+<a name="WherePK"></a>
+### func WherePK
+
+```go
+func WherePK() WriteOpt
+```
+
+WherePK uses primary key columns in WHERE clause.
 
 Generated by [gomarkdoc](<https://github.com/princjef/gomarkdoc>)
