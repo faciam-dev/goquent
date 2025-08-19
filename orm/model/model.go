@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/faciam-dev/goquent/orm/internal/stringutil"
 )
 
 // fieldInfo holds mapping metadata.
@@ -29,9 +31,10 @@ func Columns(t reflect.Type) []fieldInfo {
 	var res []fieldInfo
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-		tag := f.Tag.Get("orm")
 		col := ""
-		if tag != "" {
+		if tag := f.Tag.Get("db"); tag != "" && tag != "-" {
+			col = tag
+		} else if tag := f.Tag.Get("orm"); tag != "" {
 			parts := strings.Split(tag, ",")
 			for _, p := range parts {
 				kv := strings.SplitN(p, "=", 2)
@@ -41,7 +44,7 @@ func Columns(t reflect.Type) []fieldInfo {
 			}
 		}
 		if col == "" {
-			col = toSnake(f.Name)
+			col = stringutil.ToSnake(f.Name)
 		}
 		res = append(res, fieldInfo{name: col, index: f.Index})
 	}
@@ -49,17 +52,6 @@ func Columns(t reflect.Type) []fieldInfo {
 	defer cache.Unlock()
 	cache.m[t] = res
 	return res
-}
-
-func toSnake(s string) string {
-	var sb strings.Builder
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			sb.WriteByte('_')
-		}
-		sb.WriteRune(r)
-	}
-	return strings.ToLower(sb.String())
 }
 
 // TableName returns default table name for struct value.
@@ -71,5 +63,5 @@ func TableName(v any) string {
 		return tn.TableName()
 	}
 	t := reflect.Indirect(reflect.ValueOf(v)).Type()
-	return toSnake(t.Name()) + "s"
+	return stringutil.ToSnake(t.Name()) + "s"
 }

@@ -98,3 +98,18 @@ func TestMapsToStructs(t *testing.T) {
 		t.Errorf("unexpected result: %+v", users)
 	}
 }
+
+func TestMapToStructDBTag(t *testing.T) {
+	type user struct {
+		ID   int    `db:"id"`
+		Name string `db:"user_name"`
+	}
+	m := map[string]any{"id": 1, "user_name": "carol"}
+	var u user
+	if err := conv.MapToStruct(m, &u); err != nil {
+		t.Fatalf("map to struct: %v", err)
+	}
+	if u.ID != 1 || u.Name != "carol" {
+		t.Errorf("unexpected user: %+v", u)
+	}
+}

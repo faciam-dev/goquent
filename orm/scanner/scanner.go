@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/faciam-dev/goquent/orm/internal/stringutil"
 )
 
 // Struct scans current row into dest struct using column mapping.
@@ -28,16 +30,25 @@ func Struct(dest any, rows *sql.Rows) error {
 	if err = rows.Scan(fields...); err != nil {
 		return err
 	}
+	scannerType := reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 	for i, col := range cols {
-		f := v.FieldByNameFunc(func(name string) bool { return toSnake(name) == col })
+		f := fieldByColumn(v, col)
 		if f.IsValid() && f.CanSet() {
 			val := reflect.ValueOf(fields[i]).Elem().Interface()
 			if val != nil {
-				fv := reflect.ValueOf(val)
-				if fv.Type().ConvertibleTo(f.Type()) {
-					f.Set(fv.Convert(f.Type()))
+				if reflect.PointerTo(f.Type()).Implements(scannerType) {
+					inst := reflect.New(f.Type())
+					if err := inst.Interface().(sql.Scanner).Scan(val); err != nil {
+						return fmt.Errorf("scan %s: %w", col, err)
+					}
+					f.Set(inst.Elem())
 				} else {
-					return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
+					fv := reflect.ValueOf(val)
+					if fv.Type().ConvertibleTo(f.Type()) {
+						f.Set(fv.Convert(f.Type()))
+					} else {
+						return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
+					}
 				}
 			}
 		}
@@ -118,6 +129,7 @@ func Structs(dest any, rows *sql.Rows) error {
 		return fmt.Errorf("dest must point to slice")
 	}
 	elemType := v.Type().Elem()
+	scannerType := reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 	for rows.Next() {
 		fields := make([]any, len(cols))
 		for i := range fields {
@@ -128,15 +140,23 @@ func Structs(dest any, rows *sql.Rows) error {
 		}
 		elem := reflect.New(elemType).Elem()
 		for i, col := range cols {
-			f := elem.FieldByNameFunc(func(name string) bool { return toSnake(name) == col })
+			f := fieldByColumn(elem, col)
 			if f.IsValid() && f.CanSet() {
 				val := reflect.ValueOf(fields[i]).Elem().Interface()
 				if val != nil {
-					fv := reflect.ValueOf(val)
-					if fv.Type().ConvertibleTo(f.Type()) {
-						f.Set(fv.Convert(f.Type()))
+					if reflect.PointerTo(f.Type()).Implements(scannerType) {
+						inst := reflect.New(f.Type())
+						if err := inst.Interface().(sql.Scanner).Scan(val); err != nil {
+							return fmt.Errorf("scan %s: %w", col, err)
+						}
+						f.Set(inst.Elem())
 					} else {
-						return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
+						fv := reflect.ValueOf(val)
+						if fv.Type().ConvertibleTo(f.Type()) {
+							f.Set(fv.Convert(f.Type()))
+						} else {
+							return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
+						}
 					}
 				}
 			}
@@ -146,13 +166,35 @@ func Structs(dest any, rows *sql.Rows) error {
 	return rows.Err()
 }
 
-func toSnake(s string) string {
-	var out []rune
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			out = append(out, '_')
+func fieldByColumn(v reflect.Value, col string) reflect.Value {
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
+		if sf.PkgPath != "" {
+			continue
 		}
-		out = append(out, r)
+		name := sf.Tag.Get("db")
+		if name == "" || name == "-" {
+			if tag := sf.Tag.Get("orm"); tag != "" {
+				name = parseTag(tag)
+			}
+		}
+		if name == "" {
+			name = stringutil.ToSnake(sf.Name)
+		}
+		if name == col {
+			return v.Field(i)
+		}
 	}
-	return strings.ToLower(string(out))
+	return reflect.Value{}
+}
+
+func parseTag(tag string) string {
+	for _, part := range strings.Split(tag, ",") {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) == 2 && kv[0] == "column" {
+			return kv[1]
+		}
+	}
+	return ""
 }

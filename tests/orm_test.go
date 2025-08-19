@@ -10,10 +10,19 @@ import (
 )
 
 type User struct {
-	ID   int    `orm:"column=id,primaryKey"`
-	Name string `orm:"column=name"`
-	Age  int    `orm:"column=age"`
+	ID   int64
+	Name string
+	Age  int
 }
+
+type UserSchema struct {
+	ID     int64
+	Name   string
+	Age    int
+	Schema sql.NullString `db:"schema_name"`
+}
+
+func (UserSchema) TableName() string { return "users" }
 
 func setupDB(t testing.TB) *orm.DB {
 	dsn := "root:password@tcp(localhost:3306)/testdb?parseTime=true"
@@ -26,15 +35,16 @@ func setupDB(t testing.TB) *orm.DB {
 	}
 	stdDB, _ := sql.Open("mysql", dsn)
 	_, err = stdDB.Exec(`CREATE TABLE IF NOT EXISTS users (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(64),
-            age INT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`)
+          id BIGINT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(64),
+          age INT,
+          schema_name VARCHAR(64),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`)
 	if err != nil {
 		t.Fatalf("create table: %v", err)
 	}
-	_, err = stdDB.Exec(`CREATE TABLE IF NOT EXISTS profiles (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, bio VARCHAR(255))`)
+	_, err = stdDB.Exec(`CREATE TABLE IF NOT EXISTS profiles (id BIGINT AUTO_INCREMENT PRIMARY KEY, user_id BIGINT, bio VARCHAR(255))`)
 	if err != nil {
 		t.Fatalf("create profiles table: %v", err)
 	}
@@ -46,9 +56,9 @@ func setupDB(t testing.TB) *orm.DB {
 	if err != nil {
 		t.Fatalf("truncate profiles: %v", err)
 	}
-	_, err = stdDB.Exec("INSERT INTO users(name, age, created_at) VALUES " +
-		"('alice', 30, '2025-12-31 11:22:33')," +
-		"('bob', 25, '2025-11-20 10:10:10')")
+	_, err = stdDB.Exec("INSERT INTO users(name, age, schema_name, created_at) VALUES " +
+		"('alice', 30, 'main', '2025-12-31 11:22:33')," +
+		"('bob', 25, 'main', '2025-11-20 10:10:10')")
 	if err != nil {
 		t.Fatalf("insert users: %v", err)
 	}
@@ -75,7 +85,7 @@ func TestGetStructs(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
 	var users []User
-	if err := db.Model(&User{}).OrderBy("id", "asc").Get(&users); err != nil {
+	if err := db.Model(&User{}).Where("age", ">", 20).OrderBy("id", "asc").Get(&users); err != nil {
 		t.Fatalf("get structs: %v", err)
 	}
 	if len(users) != 2 {
@@ -83,6 +93,21 @@ func TestGetStructs(t *testing.T) {
 	}
 	if users[0].Name != "alice" || users[1].Name != "bob" {
 		t.Errorf("unexpected users: %+v", users)
+	}
+}
+
+func TestGetStructsDBTag(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	var users []UserSchema
+	if err := db.Model(&UserSchema{}).Where("age", ">", 20).OrderBy("id", "asc").Get(&users); err != nil {
+		t.Fatalf("get structs: %v", err)
+	}
+	if len(users) != 2 {
+		t.Fatalf("expected 2 users, got %d", len(users))
+	}
+	if !users[0].Schema.Valid || users[0].Schema.String != "main" {
+		t.Errorf("unexpected schema: %+v", users[0].Schema)
 	}
 }
 
