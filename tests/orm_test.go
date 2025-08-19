@@ -35,16 +35,16 @@ func setupDB(t testing.TB) *orm.DB {
 	}
 	stdDB, _ := sql.Open("mysql", dsn)
 	_, err = stdDB.Exec(`CREATE TABLE IF NOT EXISTS users (
-           id INT AUTO_INCREMENT PRIMARY KEY,
-           name VARCHAR(64),
-           age INT,
-           schema_name VARCHAR(64),
-           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-   )`)
+          id BIGINT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(64),
+          age INT,
+          schema_name VARCHAR(64),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`)
 	if err != nil {
 		t.Fatalf("create table: %v", err)
 	}
-	_, err = stdDB.Exec(`CREATE TABLE IF NOT EXISTS profiles (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, bio VARCHAR(255))`)
+	_, err = stdDB.Exec(`CREATE TABLE IF NOT EXISTS profiles (id BIGINT AUTO_INCREMENT PRIMARY KEY, user_id BIGINT, bio VARCHAR(255))`)
 	if err != nil {
 		t.Fatalf("create profiles table: %v", err)
 	}
