@@ -90,6 +90,46 @@ func MapsToStructs(src []map[string]any, dest any) error {
 	return nil
 }
 
+// StructToMap converts a struct or pointer to struct into a map. Column names
+// are determined by `db` or `orm` tags, falling back to snake_case field names.
+// Zero-value fields and those tagged with `db:"-"` are omitted.
+func StructToMap(v any) (map[string]any, error) {
+	if v == nil {
+		return nil, fmt.Errorf("value is nil")
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("StructToMap expects struct input")
+	}
+	t := rv.Type()
+	m := make(map[string]any, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
+		if sf.PkgPath != "" { // unexported field
+			continue
+		}
+		col := sf.Tag.Get("db")
+		if col == "-" {
+			continue
+		}
+		if col == "" {
+			col = parseTag(sf.Tag.Get("orm"))
+		}
+		if col == "" {
+			col = stringutil.ToSnake(sf.Name)
+		}
+		fv := rv.Field(i)
+		if fv.IsZero() {
+			continue
+		}
+		m[col] = fv.Interface()
+	}
+	return m, nil
+}
+
 func findValue(m map[string]any, name string) (any, bool) {
 	if val, ok := m[name]; ok {
 		return val, true

@@ -33,8 +33,8 @@ err = db.Table("users").Where("age", ">", 20).GetMaps(&rows)
 var users []User
 err = db.Model(&User{}).Where("age", ">", 20).Get(&users)
 
-// insert a record and get its auto-increment id (uses RETURNING on PostgreSQL)
-newID, err := db.Table("users").InsertGetId(map[string]any{"name": "sam", "age": 18})
+// insert a record using a struct and get its auto-increment id
+newID, err := db.Table("users").InsertGetId(User{Name: "sam", Age: 18})
 if err != nil {
     log.Fatal(err)
 }
@@ -68,7 +68,7 @@ tx, err := db.BeginTx(ctx, nil)
 if err != nil {
     log.Fatal(err)
 }
-if _, err = tx.Table("users").Insert(map[string]any{"name": "sam"}); err != nil {
+if _, err = tx.Table("users").Insert(User{Name: "sam"}); err != nil {
     tx.Rollback()
     log.Fatal(err)
 }

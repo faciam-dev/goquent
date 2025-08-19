@@ -167,6 +167,22 @@ func TestInsertGetId(t *testing.T) {
 	}
 }
 
+func TestInsertStructDBTag(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	u := UserSchema{Name: "greg", Age: 21, Schema: sql.NullString{String: "aux", Valid: true}}
+	if _, err := db.Model(&UserSchema{}).Insert(u); err != nil {
+		t.Fatalf("insert struct: %v", err)
+	}
+	var row map[string]any
+	if err := db.Table("users").Where("name", "greg").FirstMap(&row); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if row["schema_name"] != "aux" {
+		t.Errorf("expected schema aux, got %v", row["schema_name"])
+	}
+}
+
 func TestUpdate(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
@@ -185,6 +201,22 @@ func TestUpdate(t *testing.T) {
 	}
 	if row["age"] != int64(35) {
 		t.Errorf("expected age 35, got %v", row["age"])
+	}
+}
+
+func TestUpdateStruct(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+	type upd struct{ Age int }
+	if _, err := db.Table("users").Where("name", "bob").Update(upd{Age: 36}); err != nil {
+		t.Fatalf("update struct: %v", err)
+	}
+	var row map[string]any
+	if err := db.Table("users").Where("name", "bob").FirstMap(&row); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if row["age"] != int64(36) {
+		t.Errorf("expected age 36, got %v", row["age"])
 	}
 }
 
