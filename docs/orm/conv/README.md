@@ -11,6 +11,7 @@ import "github.com/faciam-dev/goquent/orm/conv"
 - [func As\[T any\]\(v any\) \(T, error\)](<#As>)
 - [func MapToStruct\(m map\[string\]any, dest any\) error](<#MapToStruct>)
 - [func MapsToStructs\(src \[\]map\[string\]any, dest any\) error](<#MapsToStructs>)
+- [func StructToMap\(v any\) \(map\[string\]any, error\)](<#StructToMap>)
 - [func Value\[T any\]\(m map\[string\]any, key string\) \(T, error\)](<#Value>)
 
 
@@ -40,6 +41,15 @@ func MapsToStructs(src []map[string]any, dest any) error
 ```
 
 MapsToStructs converts a slice of maps to a slice of structs.
+
+<a name="StructToMap"></a>
+## func StructToMap
+
+```go
+func StructToMap(v any) (map[string]any, error)
+```
+
+StructToMap converts a struct or pointer to struct into a map. Column names are determined by \`db\` or \`orm\` tags, falling back to snake\_case field names. Fields tagged with \`db:"\-"\` are omitted. Zero\-value fields are included unless the tag contains \`omitempty\`.
 
 <a name="Value"></a>
 ## func Value

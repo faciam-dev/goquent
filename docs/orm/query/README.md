@@ -271,7 +271,7 @@ HavingRaw adds raw HAVING condition.
 func (q *Query) Insert(data any) (sql.Result, error)
 ```
 
-Insert executes an INSERT with the given data. Maps or structs may be provided.
+Insert executes an INSERT with the given data.
 
 <a name="Query.InsertBatch"></a>
 ### func \(\*Query\) InsertBatch
@@ -829,7 +829,7 @@ UnionAll adds a UNION ALL with another query.
 func (q *Query) Update(data any) (sql.Result, error)
 ```
 
-Update executes an UPDATE with the given data. Maps or structs may be provided.
+Update executes an UPDATE with the given data.
 
 <a name="Query.UpdateOrInsert"></a>
 ### func \(\*Query\) UpdateOrInsert

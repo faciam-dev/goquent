@@ -7,6 +7,7 @@ It supports MySQL and PostgreSQL.
 ## Usage
 ```go
 import (
+       "context"
        "github.com/faciam-dev/goquent/orm"
        "github.com/faciam-dev/goquent/orm/conv"
        "log"
@@ -15,6 +16,13 @@ import (
 db, _ := orm.OpenWithDriver(orm.MySQL, "root:password@tcp(localhost:3306)/testdb?parseTime=true")
 // PostgreSQL example
 // db, _ := orm.OpenWithDriver(orm.Postgres, "postgres://user:pass@localhost/testdb?sslmode=disable")
+ctx := context.Background()
+u, _ := orm.SelectOne[User](ctx, db, "SELECT * FROM users WHERE id = ?", 1)
+rows, _ := orm.SelectAll[map[string]any](ctx, db, "SELECT * FROM users")
+
+_, _ = orm.Insert(ctx, db, User{Name: "sam", Age: 18})
+_, _ = orm.Update(ctx, db, User{ID: 1, Name: "Alice"}, orm.Columns("name"), orm.WherePK())
+_, _ = orm.Update(ctx, db, map[string]any{"id": 1, "name": "Bob"}, orm.Table("users"), orm.PK("id"), orm.WherePK())
 user := new(User)
 err := db.Model(user).Where("id", 1).First(user)
 
