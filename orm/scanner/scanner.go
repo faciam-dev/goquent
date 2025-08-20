@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"reflect"
@@ -33,23 +34,57 @@ func Struct(dest any, rows *sql.Rows) error {
 	scannerType := reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 	for i, col := range cols {
 		f := fieldByColumn(v, col)
-		if f.IsValid() && f.CanSet() {
-			val := reflect.ValueOf(fields[i]).Elem().Interface()
-			if val != nil {
-				if reflect.PointerTo(f.Type()).Implements(scannerType) {
-					inst := reflect.New(f.Type())
-					if err := inst.Interface().(sql.Scanner).Scan(val); err != nil {
-						return fmt.Errorf("scan %s: %w", col, err)
-					}
-					f.Set(inst.Elem())
-				} else {
-					fv := reflect.ValueOf(val)
-					if fv.Type().ConvertibleTo(f.Type()) {
-						f.Set(fv.Convert(f.Type()))
-					} else {
-						return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
-					}
-				}
+		if !f.IsValid() || !f.CanSet() {
+			continue
+		}
+		val := reflect.ValueOf(fields[i]).Elem().Interface()
+
+		// handle specialized bool types first
+		switch f.Type() {
+		case reflect.TypeOf(true):
+			b, err := parseBoolCompat(val)
+			if err != nil {
+				return fmt.Errorf("scan %s: %w", col, err)
+			}
+			f.SetBool(b)
+			continue
+		case reflect.TypeOf(sql.NullBool{}):
+			nb, err := parseNullBoolCompat(val)
+			if err != nil {
+				return fmt.Errorf("scan %s: %w", col, err)
+			}
+			f.Set(reflect.ValueOf(nb))
+			continue
+		}
+		if f.Kind() == reflect.Ptr && f.Type().Elem().Kind() == reflect.Bool {
+			pb, err := parsePtrBoolCompat(val)
+			if err != nil {
+				return fmt.Errorf("scan %s: %w", col, err)
+			}
+			if pb == nil {
+				f.Set(reflect.Zero(f.Type()))
+			} else {
+				f.Set(reflect.ValueOf(pb))
+			}
+			continue
+		}
+
+		if val == nil {
+			continue
+		}
+
+		if reflect.PointerTo(f.Type()).Implements(scannerType) {
+			inst := reflect.New(f.Type())
+			if err := inst.Interface().(sql.Scanner).Scan(val); err != nil {
+				return fmt.Errorf("scan %s: %w", col, err)
+			}
+			f.Set(inst.Elem())
+		} else {
+			fv := reflect.ValueOf(val)
+			if fv.Type().ConvertibleTo(f.Type()) {
+				f.Set(fv.Convert(f.Type()))
+			} else {
+				return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
 			}
 		}
 	}
@@ -141,23 +176,56 @@ func Structs(dest any, rows *sql.Rows) error {
 		elem := reflect.New(elemType).Elem()
 		for i, col := range cols {
 			f := fieldByColumn(elem, col)
-			if f.IsValid() && f.CanSet() {
-				val := reflect.ValueOf(fields[i]).Elem().Interface()
-				if val != nil {
-					if reflect.PointerTo(f.Type()).Implements(scannerType) {
-						inst := reflect.New(f.Type())
-						if err := inst.Interface().(sql.Scanner).Scan(val); err != nil {
-							return fmt.Errorf("scan %s: %w", col, err)
-						}
-						f.Set(inst.Elem())
-					} else {
-						fv := reflect.ValueOf(val)
-						if fv.Type().ConvertibleTo(f.Type()) {
-							f.Set(fv.Convert(f.Type()))
-						} else {
-							return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
-						}
-					}
+			if !f.IsValid() || !f.CanSet() {
+				continue
+			}
+			val := reflect.ValueOf(fields[i]).Elem().Interface()
+
+			switch f.Type() {
+			case reflect.TypeOf(true):
+				b, err := parseBoolCompat(val)
+				if err != nil {
+					return fmt.Errorf("scan %s: %w", col, err)
+				}
+				f.SetBool(b)
+				continue
+			case reflect.TypeOf(sql.NullBool{}):
+				nb, err := parseNullBoolCompat(val)
+				if err != nil {
+					return fmt.Errorf("scan %s: %w", col, err)
+				}
+				f.Set(reflect.ValueOf(nb))
+				continue
+			}
+			if f.Kind() == reflect.Ptr && f.Type().Elem().Kind() == reflect.Bool {
+				pb, err := parsePtrBoolCompat(val)
+				if err != nil {
+					return fmt.Errorf("scan %s: %w", col, err)
+				}
+				if pb == nil {
+					f.Set(reflect.Zero(f.Type()))
+				} else {
+					f.Set(reflect.ValueOf(pb))
+				}
+				continue
+			}
+
+			if val == nil {
+				continue
+			}
+
+			if reflect.PointerTo(f.Type()).Implements(scannerType) {
+				inst := reflect.New(f.Type())
+				if err := inst.Interface().(sql.Scanner).Scan(val); err != nil {
+					return fmt.Errorf("scan %s: %w", col, err)
+				}
+				f.Set(inst.Elem())
+			} else {
+				fv := reflect.ValueOf(val)
+				if fv.Type().ConvertibleTo(f.Type()) {
+					f.Set(fv.Convert(f.Type()))
+				} else {
+					return fmt.Errorf("type mismatch for column %s: expected %s, got %s", col, f.Type().String(), fv.Type().String())
 				}
 			}
 		}
@@ -197,4 +265,60 @@ func parseTag(tag string) string {
 		}
 	}
 	return ""
+}
+
+// bool parsing helpers with default compatibility policy
+
+func parseBoolCompat(src any) (bool, error) {
+	switch v := src.(type) {
+	case bool:
+		return v, nil
+	case int64:
+		if v == 0 {
+			return false, nil
+		}
+		return true, nil
+	case string:
+		x := strings.TrimSpace(strings.ToLower(v))
+		switch x {
+		case "true", "t", "1":
+			return true, nil
+		case "false", "f", "0":
+			return false, nil
+		}
+	case []byte:
+		x := bytes.TrimSpace(bytes.ToLower(v))
+		switch {
+		case bytes.Equal(x, []byte("true")), bytes.Equal(x, []byte("t")), bytes.Equal(x, []byte("1")):
+			return true, nil
+		case bytes.Equal(x, []byte("false")), bytes.Equal(x, []byte("f")), bytes.Equal(x, []byte("0")):
+			return false, nil
+		}
+	case nil:
+		// nil into bool returns default value (false) with no error for compatibility
+		return false, nil
+	}
+	return false, fmt.Errorf("cannot parse bool from %T(%v)", src, src)
+}
+
+func parseNullBoolCompat(src any) (sql.NullBool, error) {
+	if src == nil {
+		return sql.NullBool{Bool: false, Valid: false}, nil
+	}
+	b, err := parseBoolCompat(src)
+	if err != nil {
+		return sql.NullBool{}, err
+	}
+	return sql.NullBool{Bool: b, Valid: true}, nil
+}
+
+func parsePtrBoolCompat(src any) (*bool, error) {
+	if src == nil {
+		return nil, nil
+	}
+	b, err := parseBoolCompat(src)
+	if err != nil {
+		return nil, err
+	}
+	return &b, nil
 }
