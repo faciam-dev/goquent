@@ -21,9 +21,13 @@ import "github.com/faciam-dev/goquent/orm"
 - [func SelectStructs\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(\[\]T, error\)](<#SelectStructs>)
 - [func Update\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Update>)
 - [func Upsert\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Upsert>)
+- [type BoolScanPolicy](<#BoolScanPolicy>)
+  - [func \(p BoolScanPolicy\) String\(\) string](<#BoolScanPolicy.String>)
 - [type DB](<#DB>)
+  - [func NewDB\(sqlDB \*sql.DB, dialect driver.Dialect, opts ...Option\) \*DB](<#NewDB>)
   - [func Open\(dsn string\) \(\*DB, error\)](<#Open>)
   - [func OpenWithDriver\(driverName, dsn string\) \(\*DB, error\)](<#OpenWithDriver>)
+  - [func OpenWithDriverOptions\(driverName, dsn string, opts ...Option\) \(\*DB, error\)](<#OpenWithDriverOptions>)
   - [func \(db \*DB\) Begin\(\) \(Tx, error\)](<#DB.Begin>)
   - [func \(db \*DB\) BeginTx\(ctx context.Context, opts \*sql.TxOptions\) \(Tx, error\)](<#DB.BeginTx>)
   - [func \(db \*DB\) Close\(\) error](<#DB.Close>)
@@ -40,6 +44,11 @@ import "github.com/faciam-dev/goquent/orm"
   - [func \(db \*DB\) Table\(name string\) \*query.Query](<#DB.Table>)
   - [func \(db \*DB\) Transaction\(fn func\(tx Tx\) error\) error](<#DB.Transaction>)
   - [func \(db \*DB\) TransactionContext\(ctx context.Context, fn func\(tx Tx\) error\) error](<#DB.TransactionContext>)
+- [type ErrBoolParse](<#ErrBoolParse>)
+  - [func \(e ErrBoolParse\) Error\(\) string](<#ErrBoolParse.Error>)
+- [type Option](<#Option>)
+  - [func WithBoolScanPolicy\(p BoolScanPolicy\) Option](<#WithBoolScanPolicy>)
+- [type ScanOptions](<#ScanOptions>)
 - [type Tx](<#Tx>)
 - [type WriteOpt](<#WriteOpt>)
   - [func Columns\(cols ...string\) WriteOpt](<#Columns>)
@@ -169,6 +178,34 @@ func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 
 Upsert inserts or updates v using primary keys.
 
+<a name="BoolScanPolicy"></a>
+## type BoolScanPolicy
+
+
+
+```go
+type BoolScanPolicy int
+```
+
+<a name="BoolStrict"></a>
+
+```go
+const (
+    BoolStrict BoolScanPolicy = iota
+    BoolCompat
+    BoolLenient
+)
+```
+
+<a name="BoolScanPolicy.String"></a>
+### func \(BoolScanPolicy\) String
+
+```go
+func (p BoolScanPolicy) String() string
+```
+
+
+
 <a name="DB"></a>
 ## type DB
 
@@ -179,6 +216,15 @@ type DB struct {
     // contains filtered or unexported fields
 }
 ```
+
+<a name="NewDB"></a>
+### func NewDB
+
+```go
+func NewDB(sqlDB *sql.DB, dialect driver.Dialect, opts ...Option) *DB
+```
+
+NewDB wraps an existing sql.DB with a dialect into DB.
 
 <a name="Open"></a>
 ### func Open
@@ -197,6 +243,15 @@ func OpenWithDriver(driverName, dsn string) (*DB, error)
 ```
 
 OpenWithDriver opens a database with default pooling for the given driver.
+
+<a name="OpenWithDriverOptions"></a>
+### func OpenWithDriverOptions
+
+```go
+func OpenWithDriverOptions(driverName, dsn string, opts ...Option) (*DB, error)
+```
+
+OpenWithDriverOptions opens a database with options for the given driver.
 
 <a name="DB.Begin"></a>
 ### func \(\*DB\) Begin
@@ -341,6 +396,57 @@ func (db *DB) TransactionContext(ctx context.Context, fn func(tx Tx) error) erro
 ```
 
 TransactionContext executes fn in a transaction using ctx.
+
+<a name="ErrBoolParse"></a>
+## type ErrBoolParse
+
+
+
+```go
+type ErrBoolParse struct {
+    Column string
+    Src    any
+    Policy BoolScanPolicy
+}
+```
+
+<a name="ErrBoolParse.Error"></a>
+### func \(ErrBoolParse\) Error
+
+```go
+func (e ErrBoolParse) Error() string
+```
+
+
+
+<a name="Option"></a>
+## type Option
+
+Option configures DB at creation.
+
+```go
+type Option func(*DB)
+```
+
+<a name="WithBoolScanPolicy"></a>
+### func WithBoolScanPolicy
+
+```go
+func WithBoolScanPolicy(p BoolScanPolicy) Option
+```
+
+WithBoolScanPolicy sets the bool scanning policy.
+
+<a name="ScanOptions"></a>
+## type ScanOptions
+
+
+
+```go
+type ScanOptions struct {
+    BoolPolicy BoolScanPolicy
+}
+```
 
 <a name="Tx"></a>
 ## type Tx
