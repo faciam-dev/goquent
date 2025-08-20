@@ -22,6 +22,13 @@ type fieldMeta struct {
 	Decoder    decoderFn
 }
 
+func newFieldMeta(col string, index []int) *fieldMeta {
+	return &fieldMeta{
+		Col:       col,
+		IndexPath: index,
+	}
+}
+
 type typeMeta struct {
 	FieldsByName map[string]*fieldMeta
 	FieldsByNorm map[string]*fieldMeta
@@ -69,7 +76,7 @@ func getTypeMeta(t reflect.Type) (*typeMeta, error) {
 		if col == "" {
 			col = stringutil.ToSnake(sf.Name)
 		}
-		fm := &fieldMeta{Col: col, IndexPath: sf.Index}
+		fm := newFieldMeta(col, sf.Index)
 		for _, o := range opts {
 			switch o {
 			case "pk":

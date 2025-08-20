@@ -57,7 +57,7 @@ func scanBoolInto(dst *bool, src any, pol BoolScanPolicy) error {
 		case BoolLenient:
 			*dst = v != 0
 			return nil
-		case BoolStrict:
+		case BoolStrict, BoolCompat:
 			if v == 0 {
 				*dst = false
 				return nil
@@ -67,7 +67,7 @@ func scanBoolInto(dst *bool, src any, pol BoolScanPolicy) error {
 				return nil
 			}
 			return ErrBoolParse{Src: v, Policy: pol}
-		default: // Compat
+		default:
 			if v == 0 {
 				*dst = false
 				return nil
@@ -93,6 +93,7 @@ func scanBoolInto(dst *bool, src any, pol BoolScanPolicy) error {
 		*dst = b
 		return nil
 	case nil:
+		// plain bool cannot represent NULL; treat as parse error
 		return ErrBoolParse{Src: nil, Policy: pol}
 	default:
 		return ErrBoolParse{Src: v, Policy: pol}
