@@ -295,8 +295,8 @@ func parseBoolCompat(src any) (bool, error) {
 			return false, nil
 		}
 	case nil:
-		// nil into bool is an error
-		return false, fmt.Errorf("cannot parse bool from nil")
+		// nil into bool returns default value (false) with no error for compatibility
+		return false, nil
 	}
 	return false, fmt.Errorf("cannot parse bool from %T(%v)", src, src)
 }

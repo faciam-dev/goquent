@@ -261,3 +261,42 @@ func TestStructBoolFieldsBytes(t *testing.T) {
 		t.Fatalf("expectations: %v", err)
 	}
 }
+
+func TestStructBoolFieldsNil(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock new: %v", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"nullable", "flag", "ptr"}).AddRow(nil, nil, nil)
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	r, err := db.Query("SELECT nullable, flag, ptr FROM t")
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	defer r.Close()
+
+	var out struct {
+		Nullable bool
+		Flag     sql.NullBool
+		Ptr      *bool
+	}
+	if err := scanner.Struct(&out, r); err != nil {
+		t.Fatalf("scan struct: %v", err)
+	}
+	if out.Nullable {
+		t.Errorf("nullable expected false: %v", out.Nullable)
+	}
+	if out.Flag.Valid {
+		t.Errorf("flag expected invalid: %+v", out.Flag)
+	}
+	if out.Ptr != nil {
+		t.Errorf("ptr expected nil: %v", out.Ptr)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
