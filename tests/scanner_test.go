@@ -191,7 +191,46 @@ func TestStructBoolFields(t *testing.T) {
 	}
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"nullable", "flag", "ptr"}).AddRow(int64(1), int64(0), int64(1))
+	rows := sqlmock.NewRows([]string{"nullable", "flag", "ptr"}).AddRow(int64(2), int64(0), int64(-3))
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	r, err := db.Query("SELECT nullable, flag, ptr FROM t")
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	defer r.Close()
+
+	var out struct {
+		Nullable bool
+		Flag     sql.NullBool
+		Ptr      *bool
+	}
+	if err := scanner.Struct(&out, r); err != nil {
+		t.Fatalf("scan struct: %v", err)
+	}
+	if !out.Nullable {
+		t.Errorf("nullable not true: %v", out.Nullable)
+	}
+	if !out.Flag.Valid || out.Flag.Bool {
+		t.Errorf("flag not false: %+v", out.Flag)
+	}
+	if out.Ptr == nil || !*out.Ptr {
+		t.Errorf("ptr not true: %v", out.Ptr)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestStructBoolFieldsBytes(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock new: %v", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"nullable", "flag", "ptr"}).AddRow([]byte(" TrUe "), []byte("0"), []byte("t"))
 	mock.ExpectQuery("SELECT").WillReturnRows(rows)
 
 	r, err := db.Query("SELECT nullable, flag, ptr FROM t")

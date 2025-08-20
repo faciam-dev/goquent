@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"reflect"
@@ -276,9 +277,7 @@ func parseBoolCompat(src any) (bool, error) {
 		if v == 0 {
 			return false, nil
 		}
-		if v == 1 {
-			return true, nil
-		}
+		return true, nil
 	case string:
 		x := strings.TrimSpace(strings.ToLower(v))
 		switch x {
@@ -288,10 +287,16 @@ func parseBoolCompat(src any) (bool, error) {
 			return false, nil
 		}
 	case []byte:
-		return parseBoolCompat(string(v))
+		x := bytes.TrimSpace(bytes.ToLower(v))
+		switch {
+		case bytes.Equal(x, []byte("true")), bytes.Equal(x, []byte("t")), bytes.Equal(x, []byte("1")):
+			return true, nil
+		case bytes.Equal(x, []byte("false")), bytes.Equal(x, []byte("f")), bytes.Equal(x, []byte("0")):
+			return false, nil
+		}
 	case nil:
 		// nil into bool is an error
-		return false, fmt.Errorf("cannot parse bool from <nil>")
+		return false, fmt.Errorf("cannot parse bool from nil")
 	}
 	return false, fmt.Errorf("cannot parse bool from %T(%v)", src, src)
 }
