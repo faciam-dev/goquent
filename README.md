@@ -55,6 +55,24 @@ if err != nil {
 }
 ```
 
+### Boolean dialect compatibility
+
+goquent absorbs differences between MySQL's `TINYINT(1)` and PostgreSQL's `BOOLEAN`.
+The default `BoolCompat` policy accepts `0/1`, `t/f`, and `true/false` when scanning into
+`bool`, `sql.NullBool`, or `*bool` fields. The policy can be changed globally or per field:
+
+```go
+db, _ := orm.OpenWithDriverOptions(orm.MySQL, dsn, orm.WithBoolScanPolicy(orm.BoolStrict))
+
+type row struct {
+    Nullable bool         `db:"nullable,boolstrict"`
+    Flag     sql.NullBool `db:"flag,boollenient"`
+}
+```
+
+Use `BoolStrict` to only allow `bool` and `0/1` values. `BoolLenient` additionally accepts
+any non-zero number and strings like `"yes"`, `"on"`, or `"off"`.
+
 Transactions are handled via `Transaction`:
 ```go
 err := db.Transaction(func(tx orm.Tx) error {
