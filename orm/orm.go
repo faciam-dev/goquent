@@ -31,8 +31,17 @@ type executor interface {
 
 // DB provides main ORM interface.
 type DB struct {
-	drv  *driver.Driver
-	exec executor
+	drv      *driver.Driver
+	exec     executor
+	scanOpts ScanOptions
+}
+
+// Option configures DB at creation.
+type Option func(*DB)
+
+// WithBoolScanPolicy sets the bool scanning policy.
+func WithBoolScanPolicy(p BoolScanPolicy) Option {
+	return func(db *DB) { db.scanOpts.BoolPolicy = p }
 }
 
 // SQLDB returns the underlying *sql.DB.
@@ -56,14 +65,33 @@ func defaultDialect(name string) driver.Dialect {
 	return driver.MySQLDialect{}
 }
 
+func newDB(d *driver.Driver, exec executor, opts ...Option) *DB {
+	db := &DB{drv: d, exec: exec, scanOpts: ScanOptions{BoolPolicy: BoolCompat}}
+	for _, o := range opts {
+		o(db)
+	}
+	return db
+}
+
+// NewDB wraps an existing sql.DB with a dialect into DB.
+func NewDB(sqlDB *sql.DB, dialect driver.Dialect, opts ...Option) *DB {
+	d := &driver.Driver{DB: sqlDB, Dialect: dialect}
+	return newDB(d, sqlDB, opts...)
+}
+
 // Open opens a MySQL database with default pooling. Deprecated: use
 // OpenWithDriver to specify a driver explicitly.
 func Open(dsn string) (*DB, error) {
-	return OpenWithDriver(MySQL, dsn)
+	return OpenWithDriverOptions(MySQL, dsn)
 }
 
 // OpenWithDriver opens a database with default pooling for the given driver.
 func OpenWithDriver(driverName, dsn string) (*DB, error) {
+	return OpenWithDriverOptions(driverName, dsn)
+}
+
+// OpenWithDriverOptions opens a database with options for the given driver.
+func OpenWithDriverOptions(driverName, dsn string, opts ...Option) (*DB, error) {
 	if drv, ok := GetDriver(driverName); ok {
 		dc, ok := drv.(sqldriver.DriverContext)
 		if !ok {
@@ -85,14 +113,14 @@ func OpenWithDriver(driverName, dsn string) (*DB, error) {
 			dialect = defaultDialect(driverName)
 		}
 		d := &driver.Driver{DB: sqlDB, Dialect: dialect}
-		return &DB{drv: d, exec: sqlDB}, nil
+		return newDB(d, sqlDB, opts...), nil
 	}
 
 	drv, err := driver.Open(driverName, dsn, 10, 10, time.Hour)
 	if err != nil {
 		return nil, err
 	}
-	return &DB{drv: drv, exec: drv.DB}, nil
+	return newDB(drv, drv.DB, opts...), nil
 }
 
 // Close closes underlying DB.
@@ -100,7 +128,7 @@ func (db *DB) Close() error { return db.drv.Close() }
 
 // newTransactionDB wraps a sql.Tx in a DB instance bound to the same driver.
 func (db *DB) newTransactionDB(tx *sql.Tx) *DB {
-	return &DB{drv: db.drv, exec: tx}
+	return &DB{drv: db.drv, exec: tx, scanOpts: db.scanOpts}
 }
 
 // Tx represents a transaction-scoped DB wrapper.

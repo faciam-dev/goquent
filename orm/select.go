@@ -56,7 +56,7 @@ func SelectOne[T any](ctx context.Context, db *DB, q string, args ...any) (T, er
 		if err != nil {
 			return zero, err
 		}
-		fms := make([]fieldMeta, len(cols))
+		fms := make([]*fieldMeta, len(cols))
 		for i, c := range cols {
 			if fm, ok := meta.FieldsByName[c]; ok {
 				fms[i] = fm
@@ -80,15 +80,29 @@ func SelectOne[T any](ctx context.Context, db *DB, q string, args ...any) (T, er
 		v := reflect.New(typ).Elem()
 		scannerType := reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 		for i, fm := range fms {
-			if fm.IndexPath == nil {
+			if fm == nil || fm.IndexPath == nil {
 				continue
 			}
 			val := reflect.ValueOf(vals[i]).Elem().Interface()
-			if val == nil {
-				continue
-			}
 			f := v.FieldByIndex(fm.IndexPath)
 			if !f.CanSet() {
+				continue
+			}
+			if fm.Decoder != nil {
+				pol := db.scanOpts.BoolPolicy
+				if fm.BoolPolicy != nil {
+					pol = *fm.BoolPolicy
+				}
+				if err := fm.Decoder(f, val, pol); err != nil {
+					if e, ok := err.(ErrBoolParse); ok {
+						e.Column = fm.Col
+						return zero, e
+					}
+					return zero, fmt.Errorf("scan %s: %w", fm.Col, err)
+				}
+				continue
+			}
+			if val == nil {
 				continue
 			}
 			if reflect.PointerTo(f.Type()).Implements(scannerType) {
@@ -160,7 +174,7 @@ func SelectAll[T any](ctx context.Context, db *DB, q string, args ...any) ([]T, 
 		if err != nil {
 			return nil, err
 		}
-		fms := make([]fieldMeta, len(cols))
+		fms := make([]*fieldMeta, len(cols))
 		for i, c := range cols {
 			if fm, ok := meta.FieldsByName[c]; ok {
 				fms[i] = fm
@@ -180,15 +194,29 @@ func SelectAll[T any](ctx context.Context, db *DB, q string, args ...any) ([]T, 
 			}
 			v := reflect.New(typ).Elem()
 			for i, fm := range fms {
-				if fm.IndexPath == nil {
+				if fm == nil || fm.IndexPath == nil {
 					continue
 				}
 				val := reflect.ValueOf(vals[i]).Elem().Interface()
-				if val == nil {
-					continue
-				}
 				f := v.FieldByIndex(fm.IndexPath)
 				if !f.CanSet() {
+					continue
+				}
+				if fm.Decoder != nil {
+					pol := db.scanOpts.BoolPolicy
+					if fm.BoolPolicy != nil {
+						pol = *fm.BoolPolicy
+					}
+					if err := fm.Decoder(f, val, pol); err != nil {
+						if e, ok := err.(ErrBoolParse); ok {
+							e.Column = fm.Col
+							return nil, e
+						}
+						return nil, fmt.Errorf("scan %s: %w", fm.Col, err)
+					}
+					continue
+				}
+				if val == nil {
 					continue
 				}
 				if reflect.PointerTo(f.Type()).Implements(scannerType) {

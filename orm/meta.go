@@ -1,6 +1,7 @@
 package orm
 
 import (
+	"database/sql"
 	"fmt"
 	"reflect"
 	"strings"
@@ -9,17 +10,21 @@ import (
 	"github.com/faciam-dev/goquent/orm/internal/stringutil"
 )
 
+type decoderFn func(dst reflect.Value, src any, pol BoolScanPolicy) error
+
 type fieldMeta struct {
-	Col       string
-	IndexPath []int
-	PK        bool
-	Readonly  bool
-	OmitEmpty bool
+	Col        string
+	IndexPath  []int
+	PK         bool
+	Readonly   bool
+	OmitEmpty  bool
+	BoolPolicy *BoolScanPolicy
+	Decoder    decoderFn
 }
 
 type typeMeta struct {
-	FieldsByName map[string]fieldMeta
-	FieldsByNorm map[string]fieldMeta
+	FieldsByName map[string]*fieldMeta
+	FieldsByNorm map[string]*fieldMeta
 	PKCols       []string
 }
 
@@ -40,8 +45,8 @@ func getTypeMeta(t reflect.Type) (*typeMeta, error) {
 		return m.(*typeMeta), nil
 	}
 	m := &typeMeta{
-		FieldsByName: make(map[string]fieldMeta),
-		FieldsByNorm: make(map[string]fieldMeta),
+		FieldsByName: make(map[string]*fieldMeta),
+		FieldsByNorm: make(map[string]*fieldMeta),
 	}
 	for i := 0; i < t.NumField(); i++ {
 		sf := t.Field(i)
@@ -64,7 +69,7 @@ func getTypeMeta(t reflect.Type) (*typeMeta, error) {
 		if col == "" {
 			col = stringutil.ToSnake(sf.Name)
 		}
-		fm := fieldMeta{Col: col, IndexPath: sf.Index}
+		fm := &fieldMeta{Col: col, IndexPath: sf.Index}
 		for _, o := range opts {
 			switch o {
 			case "pk":
@@ -74,6 +79,23 @@ func getTypeMeta(t reflect.Type) (*typeMeta, error) {
 				fm.Readonly = true
 			case "omitempty":
 				fm.OmitEmpty = true
+			case "boolstrict":
+				p := BoolStrict
+				fm.BoolPolicy = &p
+			case "boollenient":
+				p := BoolLenient
+				fm.BoolPolicy = &p
+			}
+		}
+		// assign decoder based on field type
+		switch sf.Type {
+		case reflect.TypeOf(true):
+			fm.Decoder = decodeBool
+		case reflect.TypeOf(sql.NullBool{}):
+			fm.Decoder = decodeNullBool
+		default:
+			if sf.Type.Kind() == reflect.Ptr && sf.Type.Elem().Kind() == reflect.Bool {
+				fm.Decoder = decodePtrBool
 			}
 		}
 		m.FieldsByName[col] = fm
