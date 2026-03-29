@@ -2,7 +2,6 @@ package tests
 
 import (
 	"database/sql"
-	"net"
 	"testing"
 
 	"github.com/faciam-dev/goquent/orm"
@@ -10,9 +9,9 @@ import (
 )
 
 type User struct {
-	ID   int64
-	Name string
-	Age  int
+	ID   int64  `db:"id,pk"`
+	Name string `db:"name"`
+	Age  int    `db:"age"`
 }
 
 type UserSchema struct {
@@ -25,15 +24,10 @@ type UserSchema struct {
 func (UserSchema) TableName() string { return "users" }
 
 func setupDB(t testing.TB) *orm.DB {
-	dsn := "root:password@tcp(localhost:3306)/testdb?parseTime=true"
-	db, err := orm.OpenWithDriver(orm.MySQL, dsn)
-	if err != nil {
-		if _, ok := err.(*net.OpError); ok {
-			t.Skip("mysql not available")
-		}
-		t.Fatalf("open: %v", err)
-	}
-	stdDB, _ := sql.Open("mysql", dsn)
+	dsn, explicit := lookupTestDSN("TEST_MYSQL_DSN", defaultMySQLTestDSN)
+	db := openTestDB(t, orm.MySQL, dsn, explicit)
+	var err error
+	stdDB := db.SQLDB()
 	_, err = stdDB.Exec(`CREATE TABLE IF NOT EXISTS users (
           id BIGINT AUTO_INCREMENT PRIMARY KEY,
           name VARCHAR(64),

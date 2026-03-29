@@ -2,10 +2,26 @@ package tests
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/faciam-dev/goquent/orm"
 )
+
+type upsertNoUpdateUser struct {
+	ID   int64  `db:"id,pk"`
+	Name string `db:"name,omitempty"`
+	Age  int    `db:"age,omitempty"`
+}
+
+func (upsertNoUpdateUser) TableName() string { return "users" }
+
+type upsertOmitEmptyUser struct {
+	ID   int64  `db:"id,pk"`
+	Name string `db:"name,omitempty"`
+}
+
+func (upsertOmitEmptyUser) TableName() string { return "users" }
 
 func TestInsertStructGeneric(t *testing.T) {
 	db := setupDB(t)
@@ -157,7 +173,7 @@ func TestUpsertStructNoUpdate(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
 	ctx := context.Background()
-	u := User{ID: 2}
+	u := upsertNoUpdateUser{ID: 2}
 	if _, err := orm.Upsert(ctx, db, u, orm.WherePK()); err != nil {
 		t.Fatalf("upsert no update: %v", err)
 	}
@@ -167,5 +183,75 @@ func TestUpsertStructNoUpdate(t *testing.T) {
 	}
 	if name != "bob" {
 		t.Errorf("expected bob, got %s", name)
+	}
+}
+
+func TestUpsertStructKeepsPKWhenFiltered(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	if _, err := orm.Upsert(
+		ctx,
+		db,
+		User{ID: 2, Name: "bob_filtered"},
+		orm.Columns("name"),
+		orm.Omit("id"),
+		orm.WherePK(),
+	); err != nil {
+		t.Fatalf("upsert struct filtered: %v", err)
+	}
+
+	var name string
+	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = ?", 2).Scan(&name); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if name != "bob_filtered" {
+		t.Fatalf("expected bob_filtered, got %s", name)
+	}
+}
+
+func TestUpsertMapKeepsPKWhenFiltered(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	if _, err := orm.Upsert(
+		ctx,
+		db,
+		map[string]any{"id": int64(2), "name": "bob_map_filtered"},
+		orm.Table("users"),
+		orm.PK("id"),
+		orm.Columns("name"),
+		orm.Omit("id"),
+		orm.WherePK(),
+	); err != nil {
+		t.Fatalf("upsert map filtered: %v", err)
+	}
+
+	var name string
+	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = ?", 2).Scan(&name); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if name != "bob_map_filtered" {
+		t.Fatalf("expected bob_map_filtered, got %s", name)
+	}
+}
+
+func TestUpsertStructKeepsPKWhenOmitEmptyDropsOtherColumns(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	if _, err := orm.Upsert(ctx, db, upsertOmitEmptyUser{ID: 12}, orm.WherePK()); err != nil {
+		t.Fatalf("upsert omitempty: %v", err)
+	}
+
+	var name sql.NullString
+	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = ?", 12).Scan(&name); err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if name.Valid {
+		t.Fatalf("expected NULL name, got %q", name.String)
 	}
 }

@@ -21,6 +21,7 @@ u, _ := orm.SelectOne[User](ctx, db, "SELECT * FROM users WHERE id = ?", 1)
 rows, _ := orm.SelectAll[map[string]any](ctx, db, "SELECT * FROM users")
 
 _, _ = orm.Insert(ctx, db, User{Name: "sam", Age: 18})
+// Struct Update/Upsert requires PK-tagged fields, for example: ID int64 `db:"id,pk"`
 _, _ = orm.Update(ctx, db, User{ID: 1, Name: "Alice"}, orm.Columns("name"), orm.WherePK())
 _, _ = orm.Update(ctx, db, map[string]any{"id": 1, "name": "Bob"}, orm.Table("users"), orm.PK("id"), orm.WherePK())
 user := new(User)
@@ -53,6 +54,56 @@ altID, err := db.Table("accounts").PrimaryKey("account_id").InsertGetId(map[stri
 if err != nil {
     log.Fatal(err)
 }
+```
+
+## Generic API
+
+The generic API is the small typed layer around `SelectOne`, `SelectAll`, `Insert`, `Update`, and `Upsert`. Use it when you already have the SQL for a read, or when a write is a straightforward single-row operation. Use `db.Model(...).Where(...).Get(...)` or `db.Table(...).Where(...).FirstMap(...)` when you want query-builder composition instead.
+
+```go
+type UserRow struct {
+    ID   int64  `db:"id,pk"`
+    Name string `db:"name"`
+    Age  int    `db:"age"`
+}
+
+user, err := orm.SelectOne[UserRow](ctx, db, "SELECT id, name, age FROM users WHERE id = ?", 1)
+_, err = orm.Update(ctx, db, UserRow{ID: 1, Name: "Alice"}, orm.Columns("name"), orm.WherePK())
+```
+
+Map writes use the same helpers, but require explicit table and primary-key options:
+
+```go
+_, err := orm.Update(
+    ctx,
+    db,
+    map[string]any{"id": 1, "name": "Bob"},
+    orm.Table("users"),
+    orm.PK("id"),
+    orm.WherePK(),
+)
+```
+
+See [docs/orm/generic-crud.md](docs/orm/generic-crud.md) for the full guide.
+
+For advanced cases without abandoning the generic path, use `orm.Scope` plus `SelectOneBy`, `SelectAllBy`, `UpdateBy`, and `DeleteBy`:
+
+```go
+func WithProfile() orm.Scope {
+    return func(q *query.Query) *query.Query {
+        return q.Join("profiles", "users.id", "=", "profiles.user_id")
+    }
+}
+
+users, err := orm.SelectAllBy[UserRow](
+    ctx,
+    db,
+    db.Model(&UserRow{}),
+    WithProfile(),
+    func(q *query.Query) *query.Query {
+        return q.Select("users.id", "users.name", "users.age")
+    },
+)
 ```
 
 ### Boolean dialect compatibility
@@ -130,15 +181,21 @@ The repository follows the Onion Architecture:
 The `orm` directory contains the lightweight ORM used by the project.
 
 ## Development
-1. Start MySQL 8 using Docker Compose:
+1. Start the test databases:
    ```bash
-   docker-compose up -d
+   make db-up
    ```
-2. Run tests:
+2. Run the integration suite:
    ```bash
-   go test ./...
+   make test-integration
    ```
-The tests automatically create the required tables.
+   This matches the GitHub Actions CI test job.
+3. Stop the databases when finished:
+   ```bash
+   make db-down
+   ```
+
+The tests automatically create the required tables. You can override the default DSNs with `TEST_MYSQL_DSN` and `TEST_POSTGRES_DSN` if needed.
 
 
 ## Benchmarks
