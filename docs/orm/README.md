@@ -6,68 +6,11 @@
 import "github.com/faciam-dev/goquent/orm"
 ```
 
-## Practical Guide
-
-Start with [Generic CRUD](./generic-crud.md) if you want the user-facing guide for `SelectOne`, `SelectAll`, `Insert`, `Update`, and `Upsert`. The API reference below is still useful, but it does not explain when the generic helpers fit better than the query-builder API.
-
-### When to use the generic API
-
-Use the generic API when:
-
-- you already have raw SQL and want a typed `SelectOne[T]` or `SelectAll[T]`,
-- you want a compact single-row `Insert`, `Update`, or `Upsert`,
-- your write operation is naturally keyed by the row's primary key.
-
-Prefer the query-builder API when:
-
-- you want `db.Model(...).Where(...).Get(...)` or `db.Table(...).Where(...).FirstMap(...)`,
-- you need joins, fluent query composition, or non-primary-key `WHERE` clauses,
-- you want builder features such as `InsertGetId`, `Delete`, or query reuse.
-
-### Supported destination types
-
-- Generic reads support struct destinations and `map[string]any`.
-- Generic writes support non-pointer struct values and `map[string]any`.
-- Pointer destinations such as `*User` are not supported by the current generic helpers.
-
-### Generic reads
-
-```go
-user, err := orm.SelectOne[User](ctx, db, "SELECT id, name, age FROM users WHERE id = ?", 1)
-users, err := orm.SelectAll[User](ctx, db, "SELECT id, name, age FROM users ORDER BY id")
-row, err := orm.SelectOne[map[string]any](ctx, db, "SELECT id, name FROM users WHERE id = ?", 1)
-```
-
-`SelectOne` returns `sql.ErrNoRows` when the query returns nothing. Column matching for structs uses the `db` tag or the field name in `snake_case`, with a fallback normalized match that ignores case and underscores.
-
-### Generic writes
-
-```go
-type User struct {
-    ID   int64  `db:"id,pk"`
-    Name string `db:"name"`
-    Age  int    `db:"age"`
-}
-
-_, err := orm.Insert(ctx, db, User{Name: "sam", Age: 18})
-_, err = orm.Update(ctx, db, User{ID: 1, Name: "alice"}, orm.Columns("name"), orm.WherePK())
-_, err = orm.Update(ctx, db, map[string]any{"id": 1, "name": "alice"}, orm.Table("users"), orm.PK("id"), orm.WherePK())
-_, err = orm.Upsert(ctx, db, User{ID: 1, Name: "alice", Age: 18}, orm.WherePK())
-```
-
-For struct writes, `WherePK()` uses fields tagged with `db:"...,pk"`. For map writes, `Table(...)` is required, and `PK(...)` is required for `Update` and `Upsert` when using `WherePK()`.
-
-### Related pages
-
-- [Generic CRUD guide](./generic-crud.md)
-- [Query builder reference](./query/README.md)
-- [Conversion helpers](./conv/README.md)
-
 ## Index
 
-- [Practical Guide](<#practical-guide>)
-- [Generic CRUD guide](./generic-crud.md)
 - [Constants](<#constants>)
+- [func ApplyScopes\(q \*query.Query, scopes ...Scope\) \*query.Query](<#ApplyScopes>)
+- [func DeleteBy\(ctx context.Context, base \*query.Query, scopes ...Scope\) \(sql.Result, error\)](<#DeleteBy>)
 - [func GetDriver\(name string\) \(sqldriver.Driver, bool\)](<#GetDriver>)
 - [func Insert\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Insert>)
 - [func RegisterDialect\(name string, d driver.Dialect\)](<#RegisterDialect>)
@@ -75,14 +18,21 @@ For struct writes, `WherePK()` uses fields tagged with `db:"...,pk"`. For map wr
 - [func RegisterDriverWithDialect\(name string, d sqldriver.Driver, dialect driver.Dialect\)](<#RegisterDriverWithDialect>)
 - [func ResetMetaCache\(\)](<#ResetMetaCache>)
 - [func SelectAll\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(\[\]T, error\)](<#SelectAll>)
+- [func SelectAllBy\[T any\]\(ctx context.Context, db \*DB, base \*query.Query, scopes ...Scope\) \(\[\]T, error\)](<#SelectAllBy>)
 - [func SelectOne\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(T, error\)](<#SelectOne>)
+- [func SelectOneBy\[T any\]\(ctx context.Context, db \*DB, base \*query.Query, scopes ...Scope\) \(T, error\)](<#SelectOneBy>)
 - [func SelectStruct\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(T, error\)](<#SelectStruct>)
 - [func SelectStructs\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(\[\]T, error\)](<#SelectStructs>)
 - [func Update\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Update>)
+- [func UpdateBy\(ctx context.Context, base \*query.Query, data any, scopes ...Scope\) \(sql.Result, error\)](<#UpdateBy>)
 - [func Upsert\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Upsert>)
+- [type BoolScanPolicy](<#BoolScanPolicy>)
+  - [func \(p BoolScanPolicy\) String\(\) string](<#BoolScanPolicy.String>)
 - [type DB](<#DB>)
+  - [func NewDB\(sqlDB \*sql.DB, dialect driver.Dialect, opts ...Option\) \*DB](<#NewDB>)
   - [func Open\(dsn string\) \(\*DB, error\)](<#Open>)
   - [func OpenWithDriver\(driverName, dsn string\) \(\*DB, error\)](<#OpenWithDriver>)
+  - [func OpenWithDriverOptions\(driverName, dsn string, opts ...Option\) \(\*DB, error\)](<#OpenWithDriverOptions>)
   - [func \(db \*DB\) Begin\(\) \(Tx, error\)](<#DB.Begin>)
   - [func \(db \*DB\) BeginTx\(ctx context.Context, opts \*sql.TxOptions\) \(Tx, error\)](<#DB.BeginTx>)
   - [func \(db \*DB\) Close\(\) error](<#DB.Close>)
@@ -99,6 +49,13 @@ For struct writes, `WherePK()` uses fields tagged with `db:"...,pk"`. For map wr
   - [func \(db \*DB\) Table\(name string\) \*query.Query](<#DB.Table>)
   - [func \(db \*DB\) Transaction\(fn func\(tx Tx\) error\) error](<#DB.Transaction>)
   - [func \(db \*DB\) TransactionContext\(ctx context.Context, fn func\(tx Tx\) error\) error](<#DB.TransactionContext>)
+- [type ErrBoolParse](<#ErrBoolParse>)
+  - [func \(e ErrBoolParse\) Error\(\) string](<#ErrBoolParse.Error>)
+- [type Option](<#Option>)
+  - [func WithBoolScanPolicy\(p BoolScanPolicy\) Option](<#WithBoolScanPolicy>)
+- [type ScanOptions](<#ScanOptions>)
+- [type Scope](<#Scope>)
+  - [func ComposeScopes\(scopes ...Scope\) Scope](<#ComposeScopes>)
 - [type Tx](<#Tx>)
 - [type WriteOpt](<#WriteOpt>)
   - [func Columns\(cols ...string\) WriteOpt](<#Columns>)
@@ -120,8 +77,26 @@ const (
 )
 ```
 
+<a name="ApplyScopes"></a>
+## func [ApplyScopes](<https://github.com/faciam-dev/goquent/blob/main/orm/scope.go#L16>)
+
+```go
+func ApplyScopes(q *query.Query, scopes ...Scope) *query.Query
+```
+
+ApplyScopes applies scopes to q in order. Nil scopes are ignored. If a scope returns nil, the current query is kept.
+
+<a name="DeleteBy"></a>
+## func [DeleteBy](<https://github.com/faciam-dev/goquent/blob/main/orm/scope.go#L85>)
+
+```go
+func DeleteBy(ctx context.Context, base *query.Query, scopes ...Scope) (sql.Result, error)
+```
+
+DeleteBy applies scopes to base and executes a DELETE using the resulting query.
+
 <a name="GetDriver"></a>
-## func GetDriver
+## func [GetDriver](<https://github.com/faciam-dev/goquent/blob/main/orm/driver_registry.go#L38>)
 
 ```go
 func GetDriver(name string) (sqldriver.Driver, bool)
@@ -130,7 +105,7 @@ func GetDriver(name string) (sqldriver.Driver, bool)
 GetDriver retrieves a registered driver.
 
 <a name="Insert"></a>
-## func Insert
+## func [Insert](<https://github.com/faciam-dev/goquent/blob/main/orm/write.go#L98>)
 
 ```go
 func Insert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Result, error)
@@ -139,7 +114,7 @@ func Insert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 Insert inserts v into its table.
 
 <a name="RegisterDialect"></a>
-## func RegisterDialect
+## func [RegisterDialect](<https://github.com/faciam-dev/goquent/blob/main/orm/driver_registry.go#L31>)
 
 ```go
 func RegisterDialect(name string, d driver.Dialect)
@@ -148,7 +123,7 @@ func RegisterDialect(name string, d driver.Dialect)
 RegisterDialect registers a SQL dialect for a driver name.
 
 <a name="RegisterDriver"></a>
-## func RegisterDriver
+## func [RegisterDriver](<https://github.com/faciam-dev/goquent/blob/main/orm/driver_registry.go#L18>)
 
 ```go
 func RegisterDriver(name string, d sqldriver.Driver)
@@ -157,7 +132,7 @@ func RegisterDriver(name string, d sqldriver.Driver)
 RegisterDriver registers a database driver.
 
 <a name="RegisterDriverWithDialect"></a>
-## func RegisterDriverWithDialect
+## func [RegisterDriverWithDialect](<https://github.com/faciam-dev/goquent/blob/main/orm/driver_registry.go#L25>)
 
 ```go
 func RegisterDriverWithDialect(name string, d sqldriver.Driver, dialect driver.Dialect)
@@ -166,7 +141,7 @@ func RegisterDriverWithDialect(name string, d sqldriver.Driver, dialect driver.D
 RegisterDriverWithDialect registers a database driver along with its dialect.
 
 <a name="ResetMetaCache"></a>
-## func ResetMetaCache
+## func [ResetMetaCache](<https://github.com/faciam-dev/goquent/blob/main/orm/meta.go#L116>)
 
 ```go
 func ResetMetaCache()
@@ -175,7 +150,7 @@ func ResetMetaCache()
 ResetMetaCache clears cached reflection metadata. Intended for tests.
 
 <a name="SelectAll"></a>
-## func SelectAll
+## func [SelectAll](<https://github.com/faciam-dev/goquent/blob/main/orm/select.go#L132>)
 
 ```go
 func SelectAll[T any](ctx context.Context, db *DB, q string, args ...any) ([]T, error)
@@ -183,8 +158,17 @@ func SelectAll[T any](ctx context.Context, db *DB, q string, args ...any) ([]T, 
 
 SelectAll runs the query and scans all rows into \[\]T.
 
+<a name="SelectAllBy"></a>
+## func [SelectAllBy](<https://github.com/faciam-dev/goquent/blob/main/orm/scope.go#L60>)
+
+```go
+func SelectAllBy[T any](ctx context.Context, db *DB, base *query.Query, scopes ...Scope) ([]T, error)
+```
+
+SelectAllBy builds a scoped query and scans all rows into \[\]T.
+
 <a name="SelectOne"></a>
-## func SelectOne
+## func [SelectOne](<https://github.com/faciam-dev/goquent/blob/main/orm/select.go#L11>)
 
 ```go
 func SelectOne[T any](ctx context.Context, db *DB, q string, args ...any) (T, error)
@@ -192,8 +176,17 @@ func SelectOne[T any](ctx context.Context, db *DB, q string, args ...any) (T, er
 
 SelectOne runs the query and scans the first row into T.
 
+<a name="SelectOneBy"></a>
+## func [SelectOneBy](<https://github.com/faciam-dev/goquent/blob/main/orm/scope.go#L43>)
+
+```go
+func SelectOneBy[T any](ctx context.Context, db *DB, base *query.Query, scopes ...Scope) (T, error)
+```
+
+SelectOneBy builds a scoped query and scans the first row into T.
+
 <a name="SelectStruct"></a>
-## func SelectStruct
+## func [SelectStruct](<https://github.com/faciam-dev/goquent/blob/main/orm/compat.go#L6>)
 
 ```go
 func SelectStruct[T any](ctx context.Context, db *DB, q string, args ...any) (T, error)
@@ -202,7 +195,7 @@ func SelectStruct[T any](ctx context.Context, db *DB, q string, args ...any) (T,
 Deprecated: Use SelectOne instead.
 
 <a name="SelectStructs"></a>
-## func SelectStructs
+## func [SelectStructs](<https://github.com/faciam-dev/goquent/blob/main/orm/compat.go#L11>)
 
 ```go
 func SelectStructs[T any](ctx context.Context, db *DB, q string, args ...any) ([]T, error)
@@ -211,7 +204,7 @@ func SelectStructs[T any](ctx context.Context, db *DB, q string, args ...any) ([
 Deprecated: Use SelectAll instead.
 
 <a name="Update"></a>
-## func Update
+## func [Update](<https://github.com/faciam-dev/goquent/blob/main/orm/write.go#L180>)
 
 ```go
 func Update[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Result, error)
@@ -219,8 +212,17 @@ func Update[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 
 Update updates record v.
 
+<a name="UpdateBy"></a>
+## func [UpdateBy](<https://github.com/faciam-dev/goquent/blob/main/orm/scope.go#L76>)
+
+```go
+func UpdateBy(ctx context.Context, base *query.Query, data any, scopes ...Scope) (sql.Result, error)
+```
+
+UpdateBy applies scopes to base and executes an UPDATE using the resulting query.
+
 <a name="Upsert"></a>
-## func Upsert
+## func [Upsert](<https://github.com/faciam-dev/goquent/blob/main/orm/write.go#L285>)
 
 ```go
 func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Result, error)
@@ -228,8 +230,36 @@ func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 
 Upsert inserts or updates v using primary keys.
 
+<a name="BoolScanPolicy"></a>
+## type [BoolScanPolicy](<https://github.com/faciam-dev/goquent/blob/main/orm/convert_bool.go#L11>)
+
+
+
+```go
+type BoolScanPolicy int
+```
+
+<a name="BoolStrict"></a>
+
+```go
+const (
+    BoolStrict BoolScanPolicy = iota
+    BoolCompat
+    BoolLenient
+)
+```
+
+<a name="BoolScanPolicy.String"></a>
+### func \(BoolScanPolicy\) [String](<https://github.com/faciam-dev/goquent/blob/main/orm/convert_bool.go#L19>)
+
+```go
+func (p BoolScanPolicy) String() string
+```
+
+
+
 <a name="DB"></a>
-## type DB
+## type [DB](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L33-L37>)
 
 DB provides main ORM interface.
 
@@ -239,8 +269,17 @@ type DB struct {
 }
 ```
 
+<a name="NewDB"></a>
+### func [NewDB](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L77>)
+
+```go
+func NewDB(sqlDB *sql.DB, dialect driver.Dialect, opts ...Option) *DB
+```
+
+NewDB wraps an existing sql.DB with a dialect into DB.
+
 <a name="Open"></a>
-### func Open
+### func [Open](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L84>)
 
 ```go
 func Open(dsn string) (*DB, error)
@@ -249,7 +288,7 @@ func Open(dsn string) (*DB, error)
 Open opens a MySQL database with default pooling. Deprecated: use OpenWithDriver to specify a driver explicitly.
 
 <a name="OpenWithDriver"></a>
-### func OpenWithDriver
+### func [OpenWithDriver](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L89>)
 
 ```go
 func OpenWithDriver(driverName, dsn string) (*DB, error)
@@ -257,8 +296,17 @@ func OpenWithDriver(driverName, dsn string) (*DB, error)
 
 OpenWithDriver opens a database with default pooling for the given driver.
 
+<a name="OpenWithDriverOptions"></a>
+### func [OpenWithDriverOptions](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L94>)
+
+```go
+func OpenWithDriverOptions(driverName, dsn string, opts ...Option) (*DB, error)
+```
+
+OpenWithDriverOptions opens a database with options for the given driver.
+
 <a name="DB.Begin"></a>
-### func \(\*DB\) Begin
+### func \(\*DB\) [Begin](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L157>)
 
 ```go
 func (db *DB) Begin() (Tx, error)
@@ -267,7 +315,7 @@ func (db *DB) Begin() (Tx, error)
 Begin starts a transaction for manual control.
 
 <a name="DB.BeginTx"></a>
-### func \(\*DB\) BeginTx
+### func \(\*DB\) [BeginTx](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L167>)
 
 ```go
 func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
@@ -276,7 +324,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
 BeginTx starts a transaction using ctx and returns the Tx.
 
 <a name="DB.Close"></a>
-### func \(\*DB\) Close
+### func \(\*DB\) [Close](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L127>)
 
 ```go
 func (db *DB) Close() error
@@ -285,7 +333,7 @@ func (db *DB) Close() error
 Close closes underlying DB.
 
 <a name="DB.Exec"></a>
-### func \(\*DB\) Exec
+### func \(\*DB\) [Exec](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L197>)
 
 ```go
 func (db *DB) Exec(query string, args ...any) (sql.Result, error)
@@ -294,7 +342,7 @@ func (db *DB) Exec(query string, args ...any) (sql.Result, error)
 Exec executes a raw SQL statement.
 
 <a name="DB.ExecContext"></a>
-### func \(\*DB\) ExecContext
+### func \(\*DB\) [ExecContext](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L202>)
 
 ```go
 func (db *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
@@ -303,7 +351,7 @@ func (db *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.R
 ExecContext executes a raw SQL statement with a context.
 
 <a name="DB.Model"></a>
-### func \(\*DB\) Model
+### func \(\*DB\) [Model](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L177>)
 
 ```go
 func (db *DB) Model(v any) *query.Query
@@ -312,7 +360,7 @@ func (db *DB) Model(v any) *query.Query
 Model creates a query for the struct table.
 
 <a name="DB.Query"></a>
-### func \(\*DB\) Query
+### func \(\*DB\) [Query](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L187>)
 
 ```go
 func (db *DB) Query(q string, args ...any) (*sql.Rows, error)
@@ -321,7 +369,7 @@ func (db *DB) Query(q string, args ...any) (*sql.Rows, error)
 Query runs a raw SQL query returning multiple rows.
 
 <a name="DB.QueryContext"></a>
-### func \(\*DB\) QueryContext
+### func \(\*DB\) [QueryContext](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L192>)
 
 ```go
 func (db *DB) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error)
@@ -330,7 +378,7 @@ func (db *DB) QueryContext(ctx context.Context, q string, args ...any) (*sql.Row
 QueryContext runs Query with a context.
 
 <a name="DB.QueryRow"></a>
-### func \(\*DB\) QueryRow
+### func \(\*DB\) [QueryRow](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L207>)
 
 ```go
 func (db *DB) QueryRow(query string, args ...any) *sql.Row
@@ -339,7 +387,7 @@ func (db *DB) QueryRow(query string, args ...any) *sql.Row
 QueryRow executes a query that is expected to return at most one row.
 
 <a name="DB.QueryRowContext"></a>
-### func \(\*DB\) QueryRowContext
+### func \(\*DB\) [QueryRowContext](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L212>)
 
 ```go
 func (db *DB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
@@ -348,7 +396,7 @@ func (db *DB) QueryRowContext(ctx context.Context, query string, args ...any) *s
 QueryRowContext executes a query with context returning at most one row.
 
 <a name="DB.SQLDB"></a>
-### func \(\*DB\) SQLDB
+### func \(\*DB\) [SQLDB](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L48>)
 
 ```go
 func (db *DB) SQLDB() *sql.DB
@@ -357,7 +405,7 @@ func (db *DB) SQLDB() *sql.DB
 SQLDB returns the underlying \*sql.DB.
 
 <a name="DB.SelectMap"></a>
-### func \(\*DB\) SelectMap
+### func \(\*DB\) [SelectMap](<https://github.com/faciam-dev/goquent/blob/main/orm/compat.go#L16>)
 
 ```go
 func (db *DB) SelectMap(ctx context.Context, q string, args ...any) (map[string]any, error)
@@ -366,7 +414,7 @@ func (db *DB) SelectMap(ctx context.Context, q string, args ...any) (map[string]
 Deprecated: Use SelectOne with map type instead.
 
 <a name="DB.SelectMaps"></a>
-### func \(\*DB\) SelectMaps
+### func \(\*DB\) [SelectMaps](<https://github.com/faciam-dev/goquent/blob/main/orm/compat.go#L21>)
 
 ```go
 func (db *DB) SelectMaps(ctx context.Context, q string, args ...any) ([]map[string]any, error)
@@ -375,7 +423,7 @@ func (db *DB) SelectMaps(ctx context.Context, q string, args ...any) ([]map[stri
 Deprecated: Use SelectAll with map type instead.
 
 <a name="DB.Table"></a>
-### func \(\*DB\) Table
+### func \(\*DB\) [Table](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L182>)
 
 ```go
 func (db *DB) Table(name string) *query.Query
@@ -384,7 +432,7 @@ func (db *DB) Table(name string) *query.Query
 Table creates a query for table name.
 
 <a name="DB.Transaction"></a>
-### func \(\*DB\) Transaction
+### func \(\*DB\) [Transaction](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L141>)
 
 ```go
 func (db *DB) Transaction(fn func(tx Tx) error) error
@@ -393,7 +441,7 @@ func (db *DB) Transaction(fn func(tx Tx) error) error
 Transaction executes fn in a transaction.
 
 <a name="DB.TransactionContext"></a>
-### func \(\*DB\) TransactionContext
+### func \(\*DB\) [TransactionContext](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L149>)
 
 ```go
 func (db *DB) TransactionContext(ctx context.Context, fn func(tx Tx) error) error
@@ -401,8 +449,77 @@ func (db *DB) TransactionContext(ctx context.Context, fn func(tx Tx) error) erro
 
 TransactionContext executes fn in a transaction using ctx.
 
+<a name="ErrBoolParse"></a>
+## type [ErrBoolParse](<https://github.com/faciam-dev/goquent/blob/main/orm/convert_bool.go#L36-L40>)
+
+
+
+```go
+type ErrBoolParse struct {
+    Column string
+    Src    any
+    Policy BoolScanPolicy
+}
+```
+
+<a name="ErrBoolParse.Error"></a>
+### func \(ErrBoolParse\) [Error](<https://github.com/faciam-dev/goquent/blob/main/orm/convert_bool.go#L42>)
+
+```go
+func (e ErrBoolParse) Error() string
+```
+
+
+
+<a name="Option"></a>
+## type [Option](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L40>)
+
+Option configures DB at creation.
+
+```go
+type Option func(*DB)
+```
+
+<a name="WithBoolScanPolicy"></a>
+### func [WithBoolScanPolicy](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L43>)
+
+```go
+func WithBoolScanPolicy(p BoolScanPolicy) Option
+```
+
+WithBoolScanPolicy sets the bool scanning policy.
+
+<a name="ScanOptions"></a>
+## type [ScanOptions](<https://github.com/faciam-dev/goquent/blob/main/orm/convert_bool.go#L32-L34>)
+
+
+
+```go
+type ScanOptions struct {
+    BoolPolicy BoolScanPolicy
+}
+```
+
+<a name="Scope"></a>
+## type [Scope](<https://github.com/faciam-dev/goquent/blob/main/orm/scope.go#L12>)
+
+Scope applies reusable query mutations for advanced read and write flows.
+
+```go
+type Scope func(*query.Query) *query.Query
+```
+
+<a name="ComposeScopes"></a>
+### func [ComposeScopes](<https://github.com/faciam-dev/goquent/blob/main/orm/scope.go#L29>)
+
+```go
+func ComposeScopes(scopes ...Scope) Scope
+```
+
+ComposeScopes bundles scopes into a single reusable scope.
+
 <a name="Tx"></a>
-## type Tx
+## type [Tx](<https://github.com/faciam-dev/goquent/blob/main/orm/orm.go#L135-L138>)
 
 Tx represents a transaction\-scoped DB wrapper.
 
@@ -414,7 +531,7 @@ type Tx struct {
 ```
 
 <a name="WriteOpt"></a>
-## type WriteOpt
+## type [WriteOpt](<https://github.com/faciam-dev/goquent/blob/main/orm/write.go#L15>)
 
 WriteOpt configures write behavior.
 
@@ -423,7 +540,7 @@ type WriteOpt func(*writeOptions)
 ```
 
 <a name="Columns"></a>
-### func Columns
+### func [Columns](<https://github.com/faciam-dev/goquent/blob/main/orm/write.go#L27>)
 
 ```go
 func Columns(cols ...string) WriteOpt
@@ -432,7 +549,7 @@ func Columns(cols ...string) WriteOpt
 Columns limits write to specified columns.
 
 <a name="Omit"></a>
-### func Omit
+### func [Omit](<https://github.com/faciam-dev/goquent/blob/main/orm/write.go#L39>)
 
 ```go
 func Omit(cols ...string) WriteOpt
@@ -441,7 +558,7 @@ func Omit(cols ...string) WriteOpt
 Omit excludes specified columns.
 
 <a name="PK"></a>
-### func PK
+### func [PK](<https://github.com/faciam-dev/goquent/blob/main/orm/write.go#L60>)
 
 ```go
 func PK(cols ...string) WriteOpt
@@ -450,7 +567,7 @@ func PK(cols ...string) WriteOpt
 PK specifies primary key columns for map writes.
 
 <a name="Returning"></a>
-### func Returning
+### func [Returning](<https://github.com/faciam-dev/goquent/blob/main/orm/write.go#L54>)
 
 ```go
 func Returning(cols ...string) WriteOpt
@@ -459,7 +576,7 @@ func Returning(cols ...string) WriteOpt
 Returning specifies columns to return \(Postgres only\).
 
 <a name="Table"></a>
-### func Table
+### func [Table](<https://github.com/faciam-dev/goquent/blob/main/orm/write.go#L57>)
 
 ```go
 func Table(name string) WriteOpt
@@ -468,7 +585,7 @@ func Table(name string) WriteOpt
 Table sets table name \(required for map writes\).
 
 <a name="WherePK"></a>
-### func WherePK
+### func [WherePK](<https://github.com/faciam-dev/goquent/blob/main/orm/write.go#L51>)
 
 ```go
 func WherePK() WriteOpt

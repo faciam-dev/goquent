@@ -86,6 +86,26 @@ _, err := orm.Update(
 
 See [docs/orm/generic-crud.md](docs/orm/generic-crud.md) for the full guide.
 
+For advanced cases without abandoning the generic path, use `orm.Scope` plus `SelectOneBy`, `SelectAllBy`, `UpdateBy`, and `DeleteBy`:
+
+```go
+func WithProfile() orm.Scope {
+    return func(q *query.Query) *query.Query {
+        return q.Join("profiles", "users.id", "=", "profiles.user_id")
+    }
+}
+
+users, err := orm.SelectAllBy[UserRow](
+    ctx,
+    db,
+    db.Model(&UserRow{}),
+    WithProfile(),
+    func(q *query.Query) *query.Query {
+        return q.Select("users.id", "users.name", "users.age")
+    },
+)
+```
+
 ### Boolean dialect compatibility
 
 goquent absorbs differences between MySQL's `TINYINT(1)` and PostgreSQL's `BOOLEAN`.

@@ -53,6 +53,35 @@ _, err = orm.Upsert(ctx, db, User{ID: 1, Name: "sam", Age: 18}, orm.WherePK())
 
 For anything more complex than "write this row to this table", prefer `db.Table(...).Where(...).Update(...)` or raw SQL.
 
+When you want to keep the generic API as the main entry point but still need joins, arbitrary predicates, `DELETE`, or reusable query composition, use `orm.Scope` with the scoped helpers:
+
+```go
+func WithProfile() orm.Scope {
+    return func(q *query.Query) *query.Query {
+        return q.Join("profiles", "users.id", "=", "profiles.user_id")
+    }
+}
+
+func BioLike(v string) orm.Scope {
+    return func(q *query.Query) *query.Query {
+        return q.Where("profiles.bio", "like", v)
+    }
+}
+
+users, err := orm.SelectAllBy[User](
+    ctx,
+    db,
+    db.Model(&User{}),
+    orm.ComposeScopes(WithProfile(), BioLike("%go%")),
+    func(q *query.Query) *query.Query {
+        return q.Select("users.id", "users.name", "users.age").OrderBy("users.id", "asc")
+    },
+)
+
+_, err = orm.UpdateBy(ctx, db.Table("users"), map[string]any{"age": 55}, WithProfile(), BioLike("%go%"))
+_, err = orm.DeleteBy(ctx, db.Table("users"), WithProfile(), BioLike("%python%"))
+```
+
 ## Read API
 
 ### `SelectOne[T]`
@@ -215,6 +244,7 @@ _, err := orm.Update(
 
 - On MySQL it builds `INSERT ... ON DUPLICATE KEY UPDATE ...`.
 - On PostgreSQL it builds `INSERT ... ON CONFLICT (...) DO UPDATE ...`.
+- Primary-key columns used by `WherePK()` are always kept in the `INSERT` side of the statement, even if `Columns(...)`, `Omit(...)`, or `omitempty` would otherwise exclude them.
 
 If there are no non-primary-key columns left to update after filtering, the helper falls back to a no-op conflict action:
 
@@ -372,6 +402,74 @@ if err := tx.Commit(); err != nil {
 
 The same pattern works with `db.Begin()`.
 
+## Scope-Based Advanced Path
+
+`Scope` lets you keep reusable query fragments near the generic helpers instead of dropping straight to ad-hoc builder code everywhere.
+
+### `type Scope`
+
+`Scope` is:
+
+```go
+type Scope func(*query.Query) *query.Query
+```
+
+Each scope receives the current builder and returns the next one. In most cases you mutate and return the same query.
+
+### `ApplyScopes(...)`
+
+`ApplyScopes` runs scopes in order against a base query.
+
+```go
+q := orm.ApplyScopes(
+    db.Table("users"),
+    WithProfile(),
+    BioLike("%go%"),
+)
+```
+
+### `ComposeScopes(...)`
+
+`ComposeScopes` bundles smaller scopes into a reusable larger scope.
+
+```go
+activeDevelopers := orm.ComposeScopes(
+    WithProfile(),
+    BioLike("%developer%"),
+)
+```
+
+### `SelectOneBy[T]` and `SelectAllBy[T]`
+
+These helpers build SQL from a scoped query and still scan through the generic read path.
+
+```go
+user, err := orm.SelectOneBy[User](ctx, db, db.Model(&User{}), WithProfile(), BioLike("%go%"))
+users, err := orm.SelectAllBy[User](ctx, db, db.Model(&User{}), WithProfile())
+```
+
+### `UpdateBy(...)`
+
+`UpdateBy` applies scopes to a base query and then calls the query-builder `Update`.
+
+```go
+_, err := orm.UpdateBy(
+    ctx,
+    db.Table("users"),
+    map[string]any{"age": 55},
+    WithProfile(),
+    BioLike("%go%"),
+)
+```
+
+### `DeleteBy(...)`
+
+`DeleteBy` does the same for `DELETE`.
+
+```go
+_, err := orm.DeleteBy(ctx, db.Table("users"), WithProfile(), BioLike("%python%"))
+```
+
 ## Dialect notes
 
 - goquent ships with built-in `orm.MySQL` and `orm.Postgres` driver names.
@@ -385,6 +483,7 @@ The same pattern works with `db.Begin()`.
 - Reads only support struct destinations and `map[string]any`. Pointer destinations are not supported.
 - Writes only support non-pointer struct values and `map[string]any`.
 - Generic writes only support primary-key-based `Update` and `Upsert` through `WherePK()`. For arbitrary predicates, use the query-builder API.
+- Scoped helpers are the recommended bridge when you want arbitrary predicates, joins, or `DELETE` while still keeping generic read/write helpers as the main public API.
 - Struct `Update` and `Upsert` depend on `db:"...,pk"` tags. Without them, `WherePK()` has no primary-key columns to use.
 - Since generic writes take struct values, a `TableName() string` override must be available on the value type. A pointer-receiver-only `TableName` method is not picked up here.
 - Map writes do not use struct metadata, so `readonly`, `omitempty`, and field tags do not apply.

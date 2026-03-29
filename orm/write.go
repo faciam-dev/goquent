@@ -311,6 +311,9 @@ func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 			seen[col] = true
 			if o.isPK(col) {
 				pkCols = append(pkCols, col)
+				cols = append(cols, col)
+				args = append(args, fv)
+				continue
 			}
 			if len(o.cols) > 0 {
 				if _, ok := o.cols[col]; !ok {
@@ -346,6 +349,9 @@ func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 			fv := val.FieldByIndex(fm.IndexPath)
 			if fm.PK {
 				pkCols = append(pkCols, fm.Col)
+				cols = append(cols, fm.Col)
+				args = append(args, fv.Interface())
+				continue
 			}
 			if fm.Readonly {
 				continue
