@@ -181,15 +181,21 @@ The repository follows the Onion Architecture:
 The `orm` directory contains the lightweight ORM used by the project.
 
 ## Development
-1. Start MySQL 8 using Docker Compose:
+1. Start the test databases:
    ```bash
-   docker-compose up -d
+   make db-up
    ```
-2. Run tests:
+2. Run the integration suite:
    ```bash
-   go test ./...
+   make test-integration
    ```
-The tests automatically create the required tables.
+   This matches the GitHub Actions CI test job.
+3. Stop the databases when finished:
+   ```bash
+   make db-down
+   ```
+
+The tests automatically create the required tables. You can override the default DSNs with `TEST_MYSQL_DSN` and `TEST_POSTGRES_DSN` if needed.
 
 
 ## Benchmarks

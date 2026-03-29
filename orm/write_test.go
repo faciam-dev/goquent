@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/faciam-dev/goquent/orm/driver"
 )
 
@@ -46,6 +47,15 @@ func newCaptureWriteDB(d driver.Dialect) (*DB, *captureExecutor) {
 		exec:     exec,
 		scanOpts: ScanOptions{BoolPolicy: BoolCompat},
 	}, exec
+}
+
+func newReturningMockDB(t *testing.T) (*DB, sqlmock.Sqlmock) {
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	t.Cleanup(func() { sqlDB.Close() })
+	return NewDB(sqlDB, driver.PostgresDialect{}), mock
 }
 
 type genericWriteUser struct {
@@ -119,10 +129,58 @@ func TestUpsertMapAlwaysIncludesPKColumn(t *testing.T) {
 	}
 }
 
-func TestInsertReturningPostgresAddsClause(t *testing.T) {
-	db, exec := newCaptureWriteDB(driver.PostgresDialect{})
+func TestUpdateStructUsesSetArgsBeforePKArgs(t *testing.T) {
+	db, exec := newCaptureWriteDB(driver.MySQLDialect{})
 
-	_, err := Insert(
+	_, err := Update(
+		context.Background(),
+		db,
+		genericWriteUser{ID: 3, Name: "alice"},
+		Columns("name"),
+		WherePK(),
+	)
+	if err != nil {
+		t.Fatalf("update struct: %v", err)
+	}
+
+	if !strings.Contains(exec.query, "SET `name`=? WHERE `id`=?") {
+		t.Fatalf("unexpected query: %s", exec.query)
+	}
+	if len(exec.args) != 2 || exec.args[0] != "alice" || exec.args[1] != int64(3) {
+		t.Fatalf("unexpected arg order: %#v", exec.args)
+	}
+}
+
+func TestUpdateMapUsesSetArgsBeforePKArgs(t *testing.T) {
+	db, exec := newCaptureWriteDB(driver.MySQLDialect{})
+
+	_, err := Update(
+		context.Background(),
+		db,
+		map[string]any{"id": int64(4), "name": "bob"},
+		Table("users"),
+		PK("id"),
+		Columns("name"),
+		WherePK(),
+	)
+	if err != nil {
+		t.Fatalf("update map: %v", err)
+	}
+
+	if !strings.Contains(exec.query, "SET `name`=? WHERE `id`=?") {
+		t.Fatalf("unexpected query: %s", exec.query)
+	}
+	if len(exec.args) != 2 || exec.args[0] != "bob" || exec.args[1] != int64(4) {
+		t.Fatalf("unexpected arg order: %#v", exec.args)
+	}
+}
+
+func TestInsertReturningPostgresAddsClause(t *testing.T) {
+	db, mock := newReturningMockDB(t)
+	mock.ExpectQuery(`INSERT INTO "users".*RETURNING "id", "name"$`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(1, "alice"))
+
+	res, err := Insert(
 		context.Background(),
 		db,
 		genericWriteUser{Name: "alice"},
@@ -132,16 +190,20 @@ func TestInsertReturningPostgresAddsClause(t *testing.T) {
 	if err != nil {
 		t.Fatalf("insert returning: %v", err)
 	}
-
-	if !strings.HasSuffix(exec.query, ` RETURNING "id", "name"`) {
-		t.Fatalf("expected RETURNING clause, got: %s", exec.query)
+	if aff, err := res.RowsAffected(); err != nil || aff != 1 {
+		t.Fatalf("expected rows affected 1, got %d err=%v", aff, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
 	}
 }
 
 func TestUpdateReturningPostgresAddsClause(t *testing.T) {
-	db, exec := newCaptureWriteDB(driver.PostgresDialect{})
+	db, mock := newReturningMockDB(t)
+	mock.ExpectQuery(`UPDATE "users" SET .* RETURNING "id", "name"$`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(3, "alice"))
 
-	_, err := Update(
+	res, err := Update(
 		context.Background(),
 		db,
 		genericWriteUser{ID: 3, Name: "alice"},
@@ -152,16 +214,20 @@ func TestUpdateReturningPostgresAddsClause(t *testing.T) {
 	if err != nil {
 		t.Fatalf("update returning: %v", err)
 	}
-
-	if !strings.HasSuffix(exec.query, ` RETURNING "id", "name"`) {
-		t.Fatalf("expected RETURNING clause, got: %s", exec.query)
+	if aff, err := res.RowsAffected(); err != nil || aff != 1 {
+		t.Fatalf("expected rows affected 1, got %d err=%v", aff, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
 	}
 }
 
 func TestUpsertReturningPostgresAddsClause(t *testing.T) {
-	db, exec := newCaptureWriteDB(driver.PostgresDialect{})
+	db, mock := newReturningMockDB(t)
+	mock.ExpectQuery(`INSERT INTO "users".*ON CONFLICT \("id"\) DO UPDATE SET .* RETURNING "id", "name"$`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(5, "alice"))
 
-	_, err := Upsert(
+	res, err := Upsert(
 		context.Background(),
 		db,
 		genericWriteUser{ID: 5, Name: "alice"},
@@ -171,11 +237,10 @@ func TestUpsertReturningPostgresAddsClause(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upsert returning: %v", err)
 	}
-
-	if !strings.Contains(exec.query, ` ON CONFLICT ("id") DO UPDATE SET `) {
-		t.Fatalf("expected postgres upsert query, got: %s", exec.query)
+	if aff, err := res.RowsAffected(); err != nil || aff != 1 {
+		t.Fatalf("expected rows affected 1, got %d err=%v", aff, err)
 	}
-	if !strings.HasSuffix(exec.query, ` RETURNING "id", "name"`) {
-		t.Fatalf("expected RETURNING clause, got: %s", exec.query)
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
 	}
 }

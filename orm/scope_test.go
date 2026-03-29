@@ -52,6 +52,24 @@ func orderUsers() Scope {
 	}
 }
 
+func groupedUserFilter(name string, minAge int) Scope {
+	return func(q *query.Query) *query.Query {
+		return q.WhereGroup(func(g *query.Query) {
+			g.Where("users.name", name).OrWhere("users.age", ">", minAge)
+		})
+	}
+}
+
+func profileExists(db *DB, bio string) Scope {
+	return func(q *query.Query) *query.Query {
+		sub := db.Table("profiles").
+			SelectRaw("1").
+			SafeWhereRaw("profiles.user_id = users.id", map[string]any{}).
+			Where("profiles.bio", "like", bio)
+		return q.WhereExists(sub)
+	}
+}
+
 func TestComposeScopesBuildsReusableScope(t *testing.T) {
 	db, _ := newScopeMockDB(t, driver.MySQLDialect{})
 	scope := ComposeScopes(withProfiles(), bioLike("%go%"), orderUsers())
@@ -72,6 +90,27 @@ func TestComposeScopesBuildsReusableScope(t *testing.T) {
 		t.Fatalf("expected order in SQL, got: %s", sqlStr)
 	}
 	if len(args) != 1 || args[0] != "%go%" {
+		t.Fatalf("unexpected args: %#v", args)
+	}
+}
+
+func TestComposeScopesSupportsGroupsAndExists(t *testing.T) {
+	db, _ := newScopeMockDB(t, driver.MySQLDialect{})
+	scope := ComposeScopes(groupedUserFilter("alice", 29), profileExists(db, "%developer%"), orderUsers())
+
+	q := ApplyScopes(db.Table("users"), selectUserColumns(), scope)
+	sqlStr, args, err := q.Build()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	if !strings.Contains(sqlStr, "EXISTS") {
+		t.Fatalf("expected EXISTS in SQL, got: %s", sqlStr)
+	}
+	if !strings.Contains(sqlStr, " OR ") {
+		t.Fatalf("expected grouped OR in SQL, got: %s", sqlStr)
+	}
+	if !hasArg(args, "alice") || !hasArg(args, 29) || !hasArg(args, "%developer%") {
 		t.Fatalf("unexpected args: %#v", args)
 	}
 }
