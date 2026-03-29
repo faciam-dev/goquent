@@ -21,6 +21,7 @@ u, _ := orm.SelectOne[User](ctx, db, "SELECT * FROM users WHERE id = ?", 1)
 rows, _ := orm.SelectAll[map[string]any](ctx, db, "SELECT * FROM users")
 
 _, _ = orm.Insert(ctx, db, User{Name: "sam", Age: 18})
+// Struct Update/Upsert requires PK-tagged fields, for example: ID int64 `db:"id,pk"`
 _, _ = orm.Update(ctx, db, User{ID: 1, Name: "Alice"}, orm.Columns("name"), orm.WherePK())
 _, _ = orm.Update(ctx, db, map[string]any{"id": 1, "name": "Bob"}, orm.Table("users"), orm.PK("id"), orm.WherePK())
 user := new(User)
@@ -54,6 +55,36 @@ if err != nil {
     log.Fatal(err)
 }
 ```
+
+## Generic API
+
+The generic API is the small typed layer around `SelectOne`, `SelectAll`, `Insert`, `Update`, and `Upsert`. Use it when you already have the SQL for a read, or when a write is a straightforward single-row operation. Use `db.Model(...).Where(...).Get(...)` or `db.Table(...).Where(...).FirstMap(...)` when you want query-builder composition instead.
+
+```go
+type UserRow struct {
+    ID   int64  `db:"id,pk"`
+    Name string `db:"name"`
+    Age  int    `db:"age"`
+}
+
+user, err := orm.SelectOne[UserRow](ctx, db, "SELECT id, name, age FROM users WHERE id = ?", 1)
+_, err = orm.Update(ctx, db, UserRow{ID: 1, Name: "Alice"}, orm.Columns("name"), orm.WherePK())
+```
+
+Map writes use the same helpers, but require explicit table and primary-key options:
+
+```go
+_, err := orm.Update(
+    ctx,
+    db,
+    map[string]any{"id": 1, "name": "Bob"},
+    orm.Table("users"),
+    orm.PK("id"),
+    orm.WherePK(),
+)
+```
+
+See [docs/orm/generic-crud.md](docs/orm/generic-crud.md) for the full guide.
 
 ### Boolean dialect compatibility
 

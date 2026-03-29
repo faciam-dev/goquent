@@ -1,8 +1,9 @@
 # goquent Documentation
 
-## 目次
+## Index
 
-- [Package API](./README.md)
+- [ORM package API](./orm/README.md)
+- [Generic CRUD guide](./orm/generic-crud.md)
 - [Driver](./orm/driver/README.md)
 - [Model](./orm/model/README.md)
 - [Query](./orm/query/README.md)

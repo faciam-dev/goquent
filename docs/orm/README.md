@@ -6,8 +6,67 @@
 import "github.com/faciam-dev/goquent/orm"
 ```
 
+## Practical Guide
+
+Start with [Generic CRUD](./generic-crud.md) if you want the user-facing guide for `SelectOne`, `SelectAll`, `Insert`, `Update`, and `Upsert`. The API reference below is still useful, but it does not explain when the generic helpers fit better than the query-builder API.
+
+### When to use the generic API
+
+Use the generic API when:
+
+- you already have raw SQL and want a typed `SelectOne[T]` or `SelectAll[T]`,
+- you want a compact single-row `Insert`, `Update`, or `Upsert`,
+- your write operation is naturally keyed by the row's primary key.
+
+Prefer the query-builder API when:
+
+- you want `db.Model(...).Where(...).Get(...)` or `db.Table(...).Where(...).FirstMap(...)`,
+- you need joins, fluent query composition, or non-primary-key `WHERE` clauses,
+- you want builder features such as `InsertGetId`, `Delete`, or query reuse.
+
+### Supported destination types
+
+- Generic reads support struct destinations and `map[string]any`.
+- Generic writes support non-pointer struct values and `map[string]any`.
+- Pointer destinations such as `*User` are not supported by the current generic helpers.
+
+### Generic reads
+
+```go
+user, err := orm.SelectOne[User](ctx, db, "SELECT id, name, age FROM users WHERE id = ?", 1)
+users, err := orm.SelectAll[User](ctx, db, "SELECT id, name, age FROM users ORDER BY id")
+row, err := orm.SelectOne[map[string]any](ctx, db, "SELECT id, name FROM users WHERE id = ?", 1)
+```
+
+`SelectOne` returns `sql.ErrNoRows` when the query returns nothing. Column matching for structs uses the `db` tag or the field name in `snake_case`, with a fallback normalized match that ignores case and underscores.
+
+### Generic writes
+
+```go
+type User struct {
+    ID   int64  `db:"id,pk"`
+    Name string `db:"name"`
+    Age  int    `db:"age"`
+}
+
+_, err := orm.Insert(ctx, db, User{Name: "sam", Age: 18})
+_, err = orm.Update(ctx, db, User{ID: 1, Name: "alice"}, orm.Columns("name"), orm.WherePK())
+_, err = orm.Update(ctx, db, map[string]any{"id": 1, "name": "alice"}, orm.Table("users"), orm.PK("id"), orm.WherePK())
+_, err = orm.Upsert(ctx, db, User{ID: 1, Name: "alice", Age: 18}, orm.WherePK())
+```
+
+For struct writes, `WherePK()` uses fields tagged with `db:"...,pk"`. For map writes, `Table(...)` is required, and `PK(...)` is required for `Update` and `Upsert` when using `WherePK()`.
+
+### Related pages
+
+- [Generic CRUD guide](./generic-crud.md)
+- [Query builder reference](./query/README.md)
+- [Conversion helpers](./conv/README.md)
+
 ## Index
 
+- [Practical Guide](<#practical-guide>)
+- [Generic CRUD guide](./generic-crud.md)
 - [Constants](<#constants>)
 - [func GetDriver\(name string\) \(sqldriver.Driver, bool\)](<#GetDriver>)
 - [func Insert\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Insert>)
