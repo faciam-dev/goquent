@@ -49,11 +49,14 @@ func SelectOneBy[T any](ctx context.Context, db *DB, base *query.Query, scopes .
 	if err != nil {
 		return zero, err
 	}
-	sqlStr, args, err := q.Build()
+	plan, err := q.Plan(ctx)
 	if err != nil {
 		return zero, err
 	}
-	return SelectOne[T](ctx, db, sqlStr, args...)
+	if err := query.EnsurePlanExecutable(plan); err != nil {
+		return zero, err
+	}
+	return SelectOne[T](ctx, db.RequireRawApproval("goquent generated scoped query"), plan.SQL, plan.Params...)
 }
 
 // SelectAllBy builds a scoped query and scans all rows into []T.
@@ -65,11 +68,14 @@ func SelectAllBy[T any](ctx context.Context, db *DB, base *query.Query, scopes .
 	if err != nil {
 		return nil, err
 	}
-	sqlStr, args, err := q.Build()
+	plan, err := q.Plan(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return SelectAll[T](ctx, db, sqlStr, args...)
+	if err := query.EnsurePlanExecutable(plan); err != nil {
+		return nil, err
+	}
+	return SelectAll[T](ctx, db.RequireRawApproval("goquent generated scoped query"), plan.SQL, plan.Params...)
 }
 
 // UpdateBy applies scopes to base and executes an UPDATE using the resulting query.

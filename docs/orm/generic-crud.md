@@ -51,7 +51,10 @@ _, err = orm.Update(ctx, db, User{ID: 1, Name: "sam"}, orm.Columns("name"), orm.
 _, err = orm.Upsert(ctx, db, User{ID: 1, Name: "sam", Age: 18}, orm.WherePK())
 ```
 
-For anything more complex than "write this row to this table", prefer `db.Table(...).Where(...).Update(...)` or raw SQL.
+For anything more complex than "write this row to this table", prefer
+`db.Table(...).Where(...).Update(...)` so Goquent can still plan and review the operation. Use raw
+SQL only when the builder cannot reasonably express the query, and include a `QueryPlan`,
+`goquent review` output, or manual review evidence in the PR.
 
 When you want to keep the generic API as the main entry point but still need joins, arbitrary predicates, `DELETE`, or reusable query composition, use `orm.Scope` with the scoped helpers:
 

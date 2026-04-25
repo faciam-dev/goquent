@@ -94,16 +94,17 @@ func TestPostgresInsertGetId(t *testing.T) {
 func TestPostgresInsertGetIdCustomPrimaryKey(t *testing.T) {
 	db := setupPgDB(t)
 	defer db.Close()
-	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS items (
+	stdDB := db.SQLDB()
+	if _, err := stdDB.Exec(`CREATE TABLE IF NOT EXISTS items (
                item_id SERIAL PRIMARY KEY,
                name TEXT
        )`); err != nil {
 		t.Fatalf("create table: %v", err)
 	}
-	if _, err := db.Exec("TRUNCATE TABLE items RESTART IDENTITY"); err != nil {
+	if _, err := stdDB.Exec("TRUNCATE TABLE items RESTART IDENTITY"); err != nil {
 		t.Fatalf("truncate items: %v", err)
 	}
-	defer db.Exec("DROP TABLE items")
+	defer stdDB.Exec("DROP TABLE items")
 	id, err := db.Table("items").PrimaryKey("item_id").InsertGetId(map[string]any{"name": "foo"})
 	if err != nil {
 		t.Fatalf("insert get id: %v", err)
@@ -162,7 +163,7 @@ func TestPostgresUpdateReturning(t *testing.T) {
 	}
 
 	var name string
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = $1", 1).Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = $1", 1).Scan(&name); err != nil {
 		t.Fatalf("select updated: %v", err)
 	}
 	if name != "alice_pg" {
@@ -191,7 +192,7 @@ func TestPostgresUpsertReturning(t *testing.T) {
 	}
 
 	var name string
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = $1", 2).Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = $1", 2).Scan(&name); err != nil {
 		t.Fatalf("select upserted: %v", err)
 	}
 	if name != "bob_pg" {
@@ -217,7 +218,7 @@ func TestPostgresUpsertKeepsPKWhenFiltered(t *testing.T) {
 		}
 
 		var name string
-		if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = $1", 2).Scan(&name); err != nil {
+		if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = $1", 2).Scan(&name); err != nil {
 			t.Fatalf("select struct: %v", err)
 		}
 		if name != "bob_struct_pg" {
@@ -240,7 +241,7 @@ func TestPostgresUpsertKeepsPKWhenFiltered(t *testing.T) {
 		}
 
 		var name string
-		if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = $1", 1).Scan(&name); err != nil {
+		if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = $1", 1).Scan(&name); err != nil {
 			t.Fatalf("select map: %v", err)
 		}
 		if name != "alice_map_pg" {
@@ -254,7 +255,7 @@ func TestPostgresUpsertKeepsPKWhenFiltered(t *testing.T) {
 		}
 
 		var name sql.NullString
-		if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = $1", 12).Scan(&name); err != nil {
+		if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = $1", 12).Scan(&name); err != nil {
 			t.Fatalf("select omitempty: %v", err)
 		}
 		if name.Valid {
@@ -300,7 +301,7 @@ func TestPostgresUpdateByWithWhereExistsScope(t *testing.T) {
 	}
 
 	var age int
-	if err := db.QueryRowContext(context.Background(), "SELECT age FROM users WHERE id = $1", 1).Scan(&age); err != nil {
+	if err := rawQueryRow(t, db, context.Background(), "SELECT age FROM users WHERE id = $1", 1).Scan(&age); err != nil {
 		t.Fatalf("select updated age: %v", err)
 	}
 	if age != 44 {

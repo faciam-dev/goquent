@@ -1,0 +1,24 @@
+name: goquent-review
+on: [pull_request]
+
+jobs:
+  database-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+      - run: |
+          go run ./cmd/goquent manifest verify \
+            --manifest ./examples/ai-safe-orm/goquent.manifest.json \
+            --schema ./examples/ai-safe-orm/schema.json \
+            --policy ./examples/ai-safe-orm/policies.json
+      - run: |
+          go run ./cmd/goquent review \
+            --format github \
+            --fail-on blocked \
+            --manifest ./examples/ai-safe-orm/goquent.manifest.json \
+            --require-fresh-manifest \
+            ./examples/ai-safe-orm

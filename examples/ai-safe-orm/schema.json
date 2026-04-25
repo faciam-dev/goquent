@@ -1,0 +1,17 @@
+{
+  "tables": [
+    {
+      "name": "users",
+      "columns": [
+        {"name": "id", "type": "bigint", "nullable": false},
+        {"name": "tenant_id", "type": "varchar(64)", "nullable": false},
+        {"name": "name", "type": "varchar(255)", "nullable": false},
+        {"name": "email", "type": "varchar(255)", "nullable": false},
+        {"name": "deleted_at", "type": "timestamp", "nullable": true}
+      ],
+      "indexes": [
+        {"name": "idx_users_tenant_id", "columns": ["tenant_id"]}
+      ]
+    }
+  ]
+}

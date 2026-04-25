@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
@@ -22,6 +23,15 @@ type UserSchema struct {
 }
 
 func (UserSchema) TableName() string { return "users" }
+
+func rawQueryRow(t testing.TB, db *orm.DB, ctx context.Context, q string, args ...any) *sql.Row {
+	t.Helper()
+	row, err := db.RequireRawApproval("raw SQL test assertion").QueryRowE(ctx, q, args...)
+	if err != nil {
+		t.Fatalf("raw query row: %v", err)
+	}
+	return row
+}
 
 func setupDB(t testing.TB) *orm.DB {
 	dsn, explicit := lookupTestDSN("TEST_MYSQL_DSN", defaultMySQLTestDSN)
