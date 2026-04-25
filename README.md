@@ -9,14 +9,19 @@ import "github.com/faciam-dev/goquent/orm"
 ## Index
 
 - [Constants](<#constants>)
+- [Variables](<#variables>)
 - [func ApplyScopes\(q \*query.Query, scopes ...Scope\) \*query.Query](<#ApplyScopes>)
 - [func DeleteBy\(ctx context.Context, base \*query.Query, scopes ...Scope\) \(sql.Result, error\)](<#DeleteBy>)
 - [func GetDriver\(name string\) \(sqldriver.Driver, bool\)](<#GetDriver>)
 - [func Insert\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Insert>)
+- [func ManifestJSONSchema\(\) \(\[\]byte, error\)](<#ManifestJSONSchema>)
+- [func OperationSpecJSONSchema\(\) \(\[\]byte, error\)](<#OperationSpecJSONSchema>)
 - [func RegisterDialect\(name string, d driver.Dialect\)](<#RegisterDialect>)
 - [func RegisterDriver\(name string, d sqldriver.Driver\)](<#RegisterDriver>)
 - [func RegisterDriverWithDialect\(name string, d sqldriver.Driver, dialect driver.Dialect\)](<#RegisterDriverWithDialect>)
+- [func RegisterTablePolicy\(policy TablePolicy\) error](<#RegisterTablePolicy>)
 - [func ResetMetaCache\(\)](<#ResetMetaCache>)
+- [func ResetModelPolicies\(\)](<#ResetModelPolicies>)
 - [func SelectAll\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(\[\]T, error\)](<#SelectAll>)
 - [func SelectAllBy\[T any\]\(ctx context.Context, db \*DB, base \*query.Query, scopes ...Scope\) \(\[\]T, error\)](<#SelectAllBy>)
 - [func SelectOne\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(T, error\)](<#SelectOne>)
@@ -26,8 +31,13 @@ import "github.com/faciam-dev/goquent/orm"
 - [func Update\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Update>)
 - [func UpdateBy\(ctx context.Context, base \*query.Query, data any, scopes ...Scope\) \(sql.Result, error\)](<#UpdateBy>)
 - [func Upsert\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Upsert>)
+- [func ValidateManifest\(m \*Manifest\) error](<#ValidateManifest>)
+- [type AnalysisPrecision](<#AnalysisPrecision>)
+- [type Approval](<#Approval>)
 - [type BoolScanPolicy](<#BoolScanPolicy>)
   - [func \(p BoolScanPolicy\) String\(\) string](<#BoolScanPolicy.String>)
+- [type ColumnRef](<#ColumnRef>)
+- [type ColumnSchema](<#ColumnSchema>)
 - [type DB](<#DB>)
   - [func NewDB\(sqlDB \*sql.DB, dialect driver.Dialect, opts ...Option\) \*DB](<#NewDB>)
   - [func Open\(dsn string\) \(\*DB, error\)](<#Open>)
@@ -36,13 +46,16 @@ import "github.com/faciam-dev/goquent/orm"
   - [func \(db \*DB\) Begin\(\) \(Tx, error\)](<#DB.Begin>)
   - [func \(db \*DB\) BeginTx\(ctx context.Context, opts \*sql.TxOptions\) \(Tx, error\)](<#DB.BeginTx>)
   - [func \(db \*DB\) Close\(\) error](<#DB.Close>)
-  - [func \(db \*DB\) Exec\(query string, args ...any\) \(sql.Result, error\)](<#DB.Exec>)
-  - [func \(db \*DB\) ExecContext\(ctx context.Context, query string, args ...any\) \(sql.Result, error\)](<#DB.ExecContext>)
+  - [func \(db \*DB\) Exec\(q string, args ...any\) \(sql.Result, error\)](<#DB.Exec>)
+  - [func \(db \*DB\) ExecContext\(ctx context.Context, q string, args ...any\) \(sql.Result, error\)](<#DB.ExecContext>)
   - [func \(db \*DB\) Model\(v any\) \*query.Query](<#DB.Model>)
   - [func \(db \*DB\) Query\(q string, args ...any\) \(\*sql.Rows, error\)](<#DB.Query>)
   - [func \(db \*DB\) QueryContext\(ctx context.Context, q string, args ...any\) \(\*sql.Rows, error\)](<#DB.QueryContext>)
-  - [func \(db \*DB\) QueryRow\(query string, args ...any\) \*sql.Row](<#DB.QueryRow>)
-  - [func \(db \*DB\) QueryRowContext\(ctx context.Context, query string, args ...any\) \*sql.Row](<#DB.QueryRowContext>)
+  - [func \(db \*DB\) QueryRow\(q string, args ...any\) \*sql.Row](<#DB.QueryRow>)
+  - [func \(db \*DB\) QueryRowContext\(ctx context.Context, q string, args ...any\) \*sql.Row](<#DB.QueryRowContext>)
+  - [func \(db \*DB\) QueryRowE\(ctx context.Context, q string, args ...any\) \(\*sql.Row, error\)](<#DB.QueryRowE>)
+  - [func \(db \*DB\) RawPlan\(ctx context.Context, q string, args ...any\) \(\*QueryPlan, error\)](<#DB.RawPlan>)
+  - [func \(db \*DB\) RequireRawApproval\(reason string\) \*DB](<#DB.RequireRawApproval>)
   - [func \(db \*DB\) SQLDB\(\) \*sql.DB](<#DB.SQLDB>)
   - [func \(db \*DB\) SelectMap\(ctx context.Context, q string, args ...any\) \(map\[string\]any, error\)](<#DB.SelectMap>)
   - [func \(db \*DB\) SelectMaps\(ctx context.Context, q string, args ...any\) \(\[\]map\[string\]any, error\)](<#DB.SelectMaps>)
@@ -51,12 +64,77 @@ import "github.com/faciam-dev/goquent/orm"
   - [func \(db \*DB\) TransactionContext\(ctx context.Context, fn func\(tx Tx\) error\) error](<#DB.TransactionContext>)
 - [type ErrBoolParse](<#ErrBoolParse>)
   - [func \(e ErrBoolParse\) Error\(\) string](<#ErrBoolParse.Error>)
+- [type Evidence](<#Evidence>)
+- [type FilterSpec](<#FilterSpec>)
+- [type IndexSchema](<#IndexSchema>)
+- [type JoinRef](<#JoinRef>)
+- [type Manifest](<#Manifest>)
+  - [func GenerateManifest\(opts ManifestOptions\) \(\*Manifest, error\)](<#GenerateManifest>)
+  - [func LoadManifest\(path string\) \(\*Manifest, error\)](<#LoadManifest>)
+- [type ManifestColumn](<#ManifestColumn>)
+- [type ManifestFreshnessCheck](<#ManifestFreshnessCheck>)
+- [type ManifestIndex](<#ManifestIndex>)
+- [type ManifestOptions](<#ManifestOptions>)
+- [type ManifestPolicy](<#ManifestPolicy>)
+- [type ManifestQueryExample](<#ManifestQueryExample>)
+- [type ManifestRelation](<#ManifestRelation>)
+- [type ManifestTable](<#ManifestTable>)
+- [type ManifestVerification](<#ManifestVerification>)
+  - [func VerifyManifest\(stored, current \*Manifest\) ManifestVerification](<#VerifyManifest>)
+- [type MigrationPlan](<#MigrationPlan>)
+  - [func DiffSchemas\(current, desired Schema\) \*MigrationPlan](<#DiffSchemas>)
+  - [func PlanMigrationSQL\(ctx context.Context, sqlText string\) \(\*MigrationPlan, error\)](<#PlanMigrationSQL>)
+  - [func PlanMigrationSteps\(steps \[\]MigrationStep\) \*MigrationPlan](<#PlanMigrationSteps>)
+- [type MigrationStatement](<#MigrationStatement>)
+- [type MigrationStep](<#MigrationStep>)
+- [type MigrationStepType](<#MigrationStepType>)
+- [type Migrator](<#Migrator>)
+  - [func NewMigrator\(sqlText string\) \*Migrator](<#NewMigrator>)
+- [type ModelPolicyBuilder](<#ModelPolicyBuilder>)
+  - [func Model\(v any\) \*ModelPolicyBuilder](<#Model>)
+  - [func \(b \*ModelPolicyBuilder\) Err\(\) error](<#ModelPolicyBuilder.Err>)
+  - [func \(b \*ModelPolicyBuilder\) PII\(columns ...string\) \*ModelPolicyBuilder](<#ModelPolicyBuilder.PII>)
+  - [func \(b \*ModelPolicyBuilder\) PolicyMode\(mode PolicyMode\) \*ModelPolicyBuilder](<#ModelPolicyBuilder.PolicyMode>)
+  - [func \(b \*ModelPolicyBuilder\) Register\(\) error](<#ModelPolicyBuilder.Register>)
+  - [func \(b \*ModelPolicyBuilder\) RequiredFilter\(columns ...string\) \*ModelPolicyBuilder](<#ModelPolicyBuilder.RequiredFilter>)
+  - [func \(b \*ModelPolicyBuilder\) SoftDelete\(column string, mode ...PolicyMode\) \*ModelPolicyBuilder](<#ModelPolicyBuilder.SoftDelete>)
+  - [func \(b \*ModelPolicyBuilder\) Table\(name string\) \*ModelPolicyBuilder](<#ModelPolicyBuilder.Table>)
+  - [func \(b \*ModelPolicyBuilder\) TenantScoped\(column string, mode ...PolicyMode\) \*ModelPolicyBuilder](<#ModelPolicyBuilder.TenantScoped>)
+- [type OperationOptions](<#OperationOptions>)
+- [type OperationSpec](<#OperationSpec>)
+- [type OperationType](<#OperationType>)
 - [type Option](<#Option>)
   - [func WithBoolScanPolicy\(p BoolScanPolicy\) Option](<#WithBoolScanPolicy>)
+- [type OrderSpec](<#OrderSpec>)
+- [type PolicyMode](<#PolicyMode>)
+- [type PredicateRef](<#PredicateRef>)
+- [type QueryPlan](<#QueryPlan>)
+  - [func CompileOperationSpec\(ctx context.Context, spec OperationSpec, opts OperationOptions\) \(\*QueryPlan, error\)](<#CompileOperationSpec>)
+- [type RiskConfig](<#RiskConfig>)
+- [type RiskEngine](<#RiskEngine>)
+  - [func NewRiskEngine\(config RiskConfig\) RiskEngine](<#NewRiskEngine>)
+- [type RiskLevel](<#RiskLevel>)
+- [type RiskResult](<#RiskResult>)
+- [type RiskRuleConfig](<#RiskRuleConfig>)
 - [type ScanOptions](<#ScanOptions>)
+- [type Schema](<#Schema>)
 - [type Scope](<#Scope>)
   - [func ComposeScopes\(scopes ...Scope\) Scope](<#ComposeScopes>)
+- [type SourceLocation](<#SourceLocation>)
+- [type Suppression](<#Suppression>)
+  - [func NewSuppression\(code, reason string, opts ...SuppressionOption\) \(Suppression, error\)](<#NewSuppression>)
+  - [func ParseInlineSuppression\(comment string\) \(Suppression, bool, error\)](<#ParseInlineSuppression>)
+- [type SuppressionOption](<#SuppressionOption>)
+  - [func SuppressionExpiresAt\(t time.Time\) SuppressionOption](<#SuppressionExpiresAt>)
+  - [func SuppressionOwner\(owner string\) SuppressionOption](<#SuppressionOwner>)
+- [type SuppressionScope](<#SuppressionScope>)
+- [type TablePolicy](<#TablePolicy>)
+  - [func RegisteredTablePolicies\(\) \[\]TablePolicy](<#RegisteredTablePolicies>)
+- [type TableRef](<#TableRef>)
+- [type TableSchema](<#TableSchema>)
 - [type Tx](<#Tx>)
+- [type Warning](<#Warning>)
+  - [func ValidateOperationSpec\(spec OperationSpec, opts OperationOptions\) \(\[\]Warning, error\)](<#ValidateOperationSpec>)
 - [type WriteOpt](<#WriteOpt>)
   - [func Columns\(cols ...string\) WriteOpt](<#Columns>)
   - [func Omit\(cols ...string\) WriteOpt](<#Omit>)
@@ -68,12 +146,143 @@ import "github.com/faciam-dev/goquent/orm"
 
 ## Constants
 
+<a name="ManifestVersion"></a>
+
+```go
+const (
+    ManifestVersion           = manifest.Version
+    WarningManifestStale      = manifest.WarningStale
+    WarningManifestUnreadable = manifest.WarningUnreadable
+)
+```
+
+<a name="AddTable"></a>
+
+```go
+const (
+    AddTable         = migration.AddTable
+    DropTable        = migration.DropTable
+    AddColumn        = migration.AddColumn
+    DropColumn       = migration.DropColumn
+    RenameColumn     = migration.RenameColumn
+    AlterColumnType  = migration.AlterColumnType
+    AlterNullability = migration.AlterNullability
+    AddIndex         = migration.AddIndex
+    DropIndex        = migration.DropIndex
+    UnsupportedStep  = migration.UnsupportedStep
+
+    WarningMigrationUnsupported           = migration.WarningMigrationUnsupported
+    WarningMigrationDropTable             = migration.WarningMigrationDropTable
+    WarningMigrationDropColumn            = migration.WarningMigrationDropColumn
+    WarningMigrationAddNotNullColumn      = migration.WarningMigrationAddNotNullColumn
+    WarningMigrationRenameColumn          = migration.WarningMigrationRenameColumn
+    WarningMigrationAlterColumnType       = migration.WarningMigrationAlterColumnType
+    WarningMigrationTypeNarrowing         = migration.WarningMigrationTypeNarrowing
+    WarningMigrationSetNotNull            = migration.WarningMigrationSetNotNull
+    WarningMigrationAddIndexNonConcurrent = migration.WarningMigrationAddIndexNonConcurrent
+    WarningMigrationDropIndex             = migration.WarningMigrationDropIndex
+)
+```
+
+<a name="OperationSpecSelect"></a>
+
+```go
+const (
+    OperationSpecSelect                = operation.OperationSelect
+    WarningOperationSpecPIISelected    = operation.WarningOperationPIISelected
+    WarningOperationSpecRequiredFilter = operation.WarningOperationRequiredFilter
+    WarningOperationSpecMissingLimit   = operation.WarningOperationMissingLimit
+    WarningOperationSpecStaleManifest  = operation.WarningOperationStaleManifest
+)
+```
+
 <a name="MySQL"></a>Database driver names.
 
 ```go
 const (
     MySQL    = "mysql"
     Postgres = "postgres"
+)
+```
+
+<a name="OperationSelect"></a>
+
+```go
+const (
+    OperationSelect = query.OperationSelect
+    OperationInsert = query.OperationInsert
+    OperationUpdate = query.OperationUpdate
+    OperationDelete = query.OperationDelete
+    OperationRaw    = query.OperationRaw
+
+    RiskLow         = query.RiskLow
+    RiskMedium      = query.RiskMedium
+    RiskHigh        = query.RiskHigh
+    RiskDestructive = query.RiskDestructive
+    RiskBlocked     = query.RiskBlocked
+
+    AnalysisPrecise     = query.AnalysisPrecise
+    AnalysisPartial     = query.AnalysisPartial
+    AnalysisUnsupported = query.AnalysisUnsupported
+
+    WarningRawSQLUsed              = query.WarningRawSQLUsed
+    WarningUpdateWithoutWhere      = query.WarningUpdateWithoutWhere
+    WarningDeleteWithoutWhere      = query.WarningDeleteWithoutWhere
+    WarningSelectStarUsed          = query.WarningSelectStarUsed
+    WarningLimitMissing            = query.WarningLimitMissing
+    WarningBulkUpdateDetected      = query.WarningBulkUpdateDetected
+    WarningBulkDeleteDetected      = query.WarningBulkDeleteDetected
+    WarningDestructiveSQL          = query.WarningDestructiveSQL
+    WarningWeakPredicate           = query.WarningWeakPredicate
+    WarningSuppressionExpired      = query.WarningSuppressionExpired
+    WarningSuppressionNotAllowed   = query.WarningSuppressionNotAllowed
+    WarningStaticReviewPartial     = query.WarningStaticReviewPartial
+    WarningStaticReviewUnsupported = query.WarningStaticReviewUnsupported
+    WarningTenantFilterMissing     = query.WarningTenantFilterMissing
+    WarningSoftDeleteFilterMissing = query.WarningSoftDeleteFilterMissing
+    WarningPIIColumnSelected       = query.WarningPIIColumnSelected
+    WarningRequiredFilterMissing   = query.WarningRequiredFilterMissing
+
+    SuppressionScopeQuery  = query.SuppressionScopeQuery
+    SuppressionScopeInline = query.SuppressionScopeInline
+    SuppressionScopeConfig = query.SuppressionScopeConfig
+
+    PolicyModeWarn    = query.PolicyModeWarn
+    PolicyModeEnforce = query.PolicyModeEnforce
+    PolicyModeBlock   = query.PolicyModeBlock
+)
+```
+
+## Variables
+
+<a name="ErrOperationManifestRequired"></a>
+
+```go
+var (
+    ErrOperationManifestRequired        = operation.ErrManifestRequired
+    ErrOperationUnsupportedOperation    = operation.ErrUnsupportedOperation
+    ErrOperationModelRequired           = operation.ErrModelRequired
+    ErrOperationUnknownModel            = operation.ErrUnknownModel
+    ErrOperationSelectRequired          = operation.ErrSelectRequired
+    ErrOperationUnknownField            = operation.ErrUnknownField
+    ErrOperationForbiddenField          = operation.ErrForbiddenField
+    ErrOperationInvalidFilter           = operation.ErrInvalidFilter
+    ErrOperationInvalidOrder            = operation.ErrInvalidOrder
+    ErrOperationRequiredFilterMissing   = operation.ErrRequiredFilterMissing
+    ErrOperationPIIAccessReasonRequired = operation.ErrPIIAccessReasonRequired
+    ErrOperationStaleManifest           = operation.ErrStaleManifest
+)
+```
+
+<a name="ErrApprovalRequired"></a>
+
+```go
+var (
+    ErrApprovalRequired       = query.ErrApprovalRequired
+    ErrApprovalReasonRequired = query.ErrApprovalReasonRequired
+    ErrAccessReasonRequired   = query.ErrAccessReasonRequired
+    ErrBlockedOperation       = query.ErrBlockedOperation
+    DefaultRiskEngine         = query.DefaultRiskEngine
 )
 ```
 
@@ -113,6 +322,24 @@ func Insert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 
 Insert inserts v into its table.
 
+<a name="ManifestJSONSchema"></a>
+## func ManifestJSONSchema
+
+```go
+func ManifestJSONSchema() ([]byte, error)
+```
+
+
+
+<a name="OperationSpecJSONSchema"></a>
+## func OperationSpecJSONSchema
+
+```go
+func OperationSpecJSONSchema() ([]byte, error)
+```
+
+
+
 <a name="RegisterDialect"></a>
 ## func RegisterDialect
 
@@ -140,6 +367,15 @@ func RegisterDriverWithDialect(name string, d sqldriver.Driver, dialect driver.D
 
 RegisterDriverWithDialect registers a database driver along with its dialect.
 
+<a name="RegisterTablePolicy"></a>
+## func RegisterTablePolicy
+
+```go
+func RegisterTablePolicy(policy TablePolicy) error
+```
+
+RegisterTablePolicy registers a table policy directly.
+
 <a name="ResetMetaCache"></a>
 ## func ResetMetaCache
 
@@ -148,6 +384,15 @@ func ResetMetaCache()
 ```
 
 ResetMetaCache clears cached reflection metadata. Intended for tests.
+
+<a name="ResetModelPolicies"></a>
+## func ResetModelPolicies
+
+```go
+func ResetModelPolicies()
+```
+
+ResetModelPolicies clears registered model policies. Intended for tests.
 
 <a name="SelectAll"></a>
 ## func SelectAll
@@ -230,6 +475,33 @@ func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 
 Upsert inserts or updates v using primary keys.
 
+<a name="ValidateManifest"></a>
+## func ValidateManifest
+
+```go
+func ValidateManifest(m *Manifest) error
+```
+
+
+
+<a name="AnalysisPrecision"></a>
+## type AnalysisPrecision
+
+
+
+```go
+type AnalysisPrecision = query.AnalysisPrecision
+```
+
+<a name="Approval"></a>
+## type Approval
+
+
+
+```go
+type Approval = query.Approval
+```
+
 <a name="BoolScanPolicy"></a>
 ## type BoolScanPolicy
 
@@ -257,6 +529,24 @@ func (p BoolScanPolicy) String() string
 ```
 
 
+
+<a name="ColumnRef"></a>
+## type ColumnRef
+
+
+
+```go
+type ColumnRef = query.ColumnRef
+```
+
+<a name="ColumnSchema"></a>
+## type ColumnSchema
+
+
+
+```go
+type ColumnSchema = migration.ColumnSchema
+```
 
 <a name="DB"></a>
 ## type DB
@@ -336,7 +626,7 @@ Close closes underlying DB.
 ### func \(\*DB\) Exec
 
 ```go
-func (db *DB) Exec(query string, args ...any) (sql.Result, error)
+func (db *DB) Exec(q string, args ...any) (sql.Result, error)
 ```
 
 Exec executes a raw SQL statement.
@@ -345,7 +635,7 @@ Exec executes a raw SQL statement.
 ### func \(\*DB\) ExecContext
 
 ```go
-func (db *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+func (db *DB) ExecContext(ctx context.Context, q string, args ...any) (sql.Result, error)
 ```
 
 ExecContext executes a raw SQL statement with a context.
@@ -381,19 +671,50 @@ QueryContext runs Query with a context.
 ### func \(\*DB\) QueryRow
 
 ```go
-func (db *DB) QueryRow(query string, args ...any) *sql.Row
+func (db *DB) QueryRow(q string, args ...any) *sql.Row
 ```
 
 QueryRow executes a query that is expected to return at most one row.
+
+Deprecated: use QueryRowE so raw SQL safety errors can be returned before Scan. QueryRow cannot surface pre\-execution approval errors because \*sql.Row has no public error constructor. When raw SQL approval checks fail, QueryRow does not execute the caller\-supplied SQL.
 
 <a name="DB.QueryRowContext"></a>
 ### func \(\*DB\) QueryRowContext
 
 ```go
-func (db *DB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+func (db *DB) QueryRowContext(ctx context.Context, q string, args ...any) *sql.Row
 ```
 
 QueryRowContext executes a query with context returning at most one row.
+
+Deprecated: use QueryRowE so raw SQL safety errors can be returned before Scan. QueryRowContext cannot surface pre\-execution approval errors because \*sql.Row has no public error constructor. When raw SQL approval checks fail, QueryRowContext does not execute the caller\-supplied SQL.
+
+<a name="DB.QueryRowE"></a>
+### func \(\*DB\) QueryRowE
+
+```go
+func (db *DB) QueryRowE(ctx context.Context, q string, args ...any) (*sql.Row, error)
+```
+
+QueryRowE validates raw SQL policy and executes a context\-aware single\-row query.
+
+<a name="DB.RawPlan"></a>
+### func \(\*DB\) RawPlan
+
+```go
+func (db *DB) RawPlan(ctx context.Context, q string, args ...any) (*QueryPlan, error)
+```
+
+RawPlan creates a plan for caller\-supplied SQL without executing it.
+
+<a name="DB.RequireRawApproval"></a>
+### func \(\*DB\) RequireRawApproval
+
+```go
+func (db *DB) RequireRawApproval(reason string) *DB
+```
+
+RequireRawApproval returns a shallow DB copy that can execute risky raw SQL with an explicit approval reason.
 
 <a name="DB.SQLDB"></a>
 ### func \(\*DB\) SQLDB
@@ -471,6 +792,359 @@ func (e ErrBoolParse) Error() string
 
 
 
+<a name="Evidence"></a>
+## type Evidence
+
+
+
+```go
+type Evidence = query.Evidence
+```
+
+<a name="FilterSpec"></a>
+## type FilterSpec
+
+
+
+```go
+type FilterSpec = operation.FilterSpec
+```
+
+<a name="IndexSchema"></a>
+## type IndexSchema
+
+
+
+```go
+type IndexSchema = migration.IndexSchema
+```
+
+<a name="JoinRef"></a>
+## type JoinRef
+
+
+
+```go
+type JoinRef = query.JoinRef
+```
+
+<a name="Manifest"></a>
+## type Manifest
+
+
+
+```go
+type Manifest = manifest.Manifest
+```
+
+<a name="GenerateManifest"></a>
+### func GenerateManifest
+
+```go
+func GenerateManifest(opts ManifestOptions) (*Manifest, error)
+```
+
+
+
+<a name="LoadManifest"></a>
+### func LoadManifest
+
+```go
+func LoadManifest(path string) (*Manifest, error)
+```
+
+
+
+<a name="ManifestColumn"></a>
+## type ManifestColumn
+
+
+
+```go
+type ManifestColumn = manifest.Column
+```
+
+<a name="ManifestFreshnessCheck"></a>
+## type ManifestFreshnessCheck
+
+
+
+```go
+type ManifestFreshnessCheck = manifest.FreshnessCheck
+```
+
+<a name="ManifestIndex"></a>
+## type ManifestIndex
+
+
+
+```go
+type ManifestIndex = manifest.Index
+```
+
+<a name="ManifestOptions"></a>
+## type ManifestOptions
+
+
+
+```go
+type ManifestOptions = manifest.Options
+```
+
+<a name="ManifestPolicy"></a>
+## type ManifestPolicy
+
+
+
+```go
+type ManifestPolicy = manifest.Policy
+```
+
+<a name="ManifestQueryExample"></a>
+## type ManifestQueryExample
+
+
+
+```go
+type ManifestQueryExample = manifest.QueryExample
+```
+
+<a name="ManifestRelation"></a>
+## type ManifestRelation
+
+
+
+```go
+type ManifestRelation = manifest.Relation
+```
+
+<a name="ManifestTable"></a>
+## type ManifestTable
+
+
+
+```go
+type ManifestTable = manifest.Table
+```
+
+<a name="ManifestVerification"></a>
+## type ManifestVerification
+
+
+
+```go
+type ManifestVerification = manifest.Verification
+```
+
+<a name="VerifyManifest"></a>
+### func VerifyManifest
+
+```go
+func VerifyManifest(stored, current *Manifest) ManifestVerification
+```
+
+
+
+<a name="MigrationPlan"></a>
+## type MigrationPlan
+
+
+
+```go
+type MigrationPlan = migration.MigrationPlan
+```
+
+<a name="DiffSchemas"></a>
+### func DiffSchemas
+
+```go
+func DiffSchemas(current, desired Schema) *MigrationPlan
+```
+
+
+
+<a name="PlanMigrationSQL"></a>
+### func PlanMigrationSQL
+
+```go
+func PlanMigrationSQL(ctx context.Context, sqlText string) (*MigrationPlan, error)
+```
+
+
+
+<a name="PlanMigrationSteps"></a>
+### func PlanMigrationSteps
+
+```go
+func PlanMigrationSteps(steps []MigrationStep) *MigrationPlan
+```
+
+
+
+<a name="MigrationStatement"></a>
+## type MigrationStatement
+
+
+
+```go
+type MigrationStatement = migration.MigrationStatement
+```
+
+<a name="MigrationStep"></a>
+## type MigrationStep
+
+
+
+```go
+type MigrationStep = migration.MigrationStep
+```
+
+<a name="MigrationStepType"></a>
+## type MigrationStepType
+
+
+
+```go
+type MigrationStepType = migration.MigrationStepType
+```
+
+<a name="Migrator"></a>
+## type Migrator
+
+
+
+```go
+type Migrator = migration.Migrator
+```
+
+<a name="NewMigrator"></a>
+### func NewMigrator
+
+```go
+func NewMigrator(sqlText string) *Migrator
+```
+
+
+
+<a name="ModelPolicyBuilder"></a>
+## type ModelPolicyBuilder
+
+ModelPolicyBuilder registers table policy metadata for a model/table.
+
+```go
+type ModelPolicyBuilder struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="Model"></a>
+### func Model
+
+```go
+func Model(v any) *ModelPolicyBuilder
+```
+
+Model starts a policy declaration for v's table.
+
+<a name="ModelPolicyBuilder.Err"></a>
+### func \(\*ModelPolicyBuilder\) Err
+
+```go
+func (b *ModelPolicyBuilder) Err() error
+```
+
+Err returns the last registration error.
+
+<a name="ModelPolicyBuilder.PII"></a>
+### func \(\*ModelPolicyBuilder\) PII
+
+```go
+func (b *ModelPolicyBuilder) PII(columns ...string) *ModelPolicyBuilder
+```
+
+PII marks columns as personally identifiable information.
+
+<a name="ModelPolicyBuilder.PolicyMode"></a>
+### func \(\*ModelPolicyBuilder\) PolicyMode
+
+```go
+func (b *ModelPolicyBuilder) PolicyMode(mode PolicyMode) *ModelPolicyBuilder
+```
+
+PolicyMode sets all policy modes for this model declaration.
+
+<a name="ModelPolicyBuilder.Register"></a>
+### func \(\*ModelPolicyBuilder\) Register
+
+```go
+func (b *ModelPolicyBuilder) Register() error
+```
+
+Register explicitly registers the current policy.
+
+<a name="ModelPolicyBuilder.RequiredFilter"></a>
+### func \(\*ModelPolicyBuilder\) RequiredFilter
+
+```go
+func (b *ModelPolicyBuilder) RequiredFilter(columns ...string) *ModelPolicyBuilder
+```
+
+RequiredFilter requires filters on the provided columns.
+
+<a name="ModelPolicyBuilder.SoftDelete"></a>
+### func \(\*ModelPolicyBuilder\) SoftDelete
+
+```go
+func (b *ModelPolicyBuilder) SoftDelete(column string, mode ...PolicyMode) *ModelPolicyBuilder
+```
+
+SoftDelete marks column as the soft delete column.
+
+<a name="ModelPolicyBuilder.Table"></a>
+### func \(\*ModelPolicyBuilder\) Table
+
+```go
+func (b *ModelPolicyBuilder) Table(name string) *ModelPolicyBuilder
+```
+
+Table overrides the table name for this policy declaration.
+
+<a name="ModelPolicyBuilder.TenantScoped"></a>
+### func \(\*ModelPolicyBuilder\) TenantScoped
+
+```go
+func (b *ModelPolicyBuilder) TenantScoped(column string, mode ...PolicyMode) *ModelPolicyBuilder
+```
+
+TenantScoped marks column as the tenant scope column.
+
+<a name="OperationOptions"></a>
+## type OperationOptions
+
+
+
+```go
+type OperationOptions = operation.Options
+```
+
+<a name="OperationSpec"></a>
+## type OperationSpec
+
+
+
+```go
+type OperationSpec = operation.OperationSpec
+```
+
+<a name="OperationType"></a>
+## type OperationType
+
+
+
+```go
+type OperationType = query.OperationType
+```
+
 <a name="Option"></a>
 ## type Option
 
@@ -489,6 +1163,105 @@ func WithBoolScanPolicy(p BoolScanPolicy) Option
 
 WithBoolScanPolicy sets the bool scanning policy.
 
+<a name="OrderSpec"></a>
+## type OrderSpec
+
+
+
+```go
+type OrderSpec = operation.OrderSpec
+```
+
+<a name="PolicyMode"></a>
+## type PolicyMode
+
+
+
+```go
+type PolicyMode = query.PolicyMode
+```
+
+<a name="PredicateRef"></a>
+## type PredicateRef
+
+
+
+```go
+type PredicateRef = query.PredicateRef
+```
+
+<a name="QueryPlan"></a>
+## type QueryPlan
+
+
+
+```go
+type QueryPlan = query.QueryPlan
+```
+
+<a name="CompileOperationSpec"></a>
+### func CompileOperationSpec
+
+```go
+func CompileOperationSpec(ctx context.Context, spec OperationSpec, opts OperationOptions) (*QueryPlan, error)
+```
+
+
+
+<a name="RiskConfig"></a>
+## type RiskConfig
+
+
+
+```go
+type RiskConfig = query.RiskConfig
+```
+
+<a name="RiskEngine"></a>
+## type RiskEngine
+
+
+
+```go
+type RiskEngine = query.RiskEngine
+```
+
+<a name="NewRiskEngine"></a>
+### func NewRiskEngine
+
+```go
+func NewRiskEngine(config RiskConfig) RiskEngine
+```
+
+
+
+<a name="RiskLevel"></a>
+## type RiskLevel
+
+
+
+```go
+type RiskLevel = query.RiskLevel
+```
+
+<a name="RiskResult"></a>
+## type RiskResult
+
+
+
+```go
+type RiskResult = query.RiskResult
+```
+
+<a name="RiskRuleConfig"></a>
+## type RiskRuleConfig
+
+
+
+```go
+type RiskRuleConfig = query.RiskRuleConfig
+```
+
 <a name="ScanOptions"></a>
 ## type ScanOptions
 
@@ -498,6 +1271,15 @@ WithBoolScanPolicy sets the bool scanning policy.
 type ScanOptions struct {
     BoolPolicy BoolScanPolicy
 }
+```
+
+<a name="Schema"></a>
+## type Schema
+
+
+
+```go
+type Schema = migration.Schema
 ```
 
 <a name="Scope"></a>
@@ -518,6 +1300,114 @@ func ComposeScopes(scopes ...Scope) Scope
 
 ComposeScopes bundles scopes into a single reusable scope.
 
+<a name="SourceLocation"></a>
+## type SourceLocation
+
+
+
+```go
+type SourceLocation = query.SourceLocation
+```
+
+<a name="Suppression"></a>
+## type Suppression
+
+
+
+```go
+type Suppression = query.Suppression
+```
+
+<a name="NewSuppression"></a>
+### func NewSuppression
+
+```go
+func NewSuppression(code, reason string, opts ...SuppressionOption) (Suppression, error)
+```
+
+
+
+<a name="ParseInlineSuppression"></a>
+### func ParseInlineSuppression
+
+```go
+func ParseInlineSuppression(comment string) (Suppression, bool, error)
+```
+
+
+
+<a name="SuppressionOption"></a>
+## type SuppressionOption
+
+
+
+```go
+type SuppressionOption = query.SuppressionOption
+```
+
+<a name="SuppressionExpiresAt"></a>
+### func SuppressionExpiresAt
+
+```go
+func SuppressionExpiresAt(t time.Time) SuppressionOption
+```
+
+
+
+<a name="SuppressionOwner"></a>
+### func SuppressionOwner
+
+```go
+func SuppressionOwner(owner string) SuppressionOption
+```
+
+
+
+<a name="SuppressionScope"></a>
+## type SuppressionScope
+
+
+
+```go
+type SuppressionScope = query.SuppressionScope
+```
+
+<a name="TablePolicy"></a>
+## type TablePolicy
+
+
+
+```go
+type TablePolicy = query.TablePolicy
+```
+
+<a name="RegisteredTablePolicies"></a>
+### func RegisteredTablePolicies
+
+```go
+func RegisteredTablePolicies() []TablePolicy
+```
+
+RegisteredTablePolicies returns all registered table policies in stable order.
+
+<a name="TableRef"></a>
+## type TableRef
+
+
+
+```go
+type TableRef = query.TableRef
+```
+
+<a name="TableSchema"></a>
+## type TableSchema
+
+
+
+```go
+type TableSchema = migration.TableSchema
+```
+
 <a name="Tx"></a>
 ## type Tx
 
@@ -529,6 +1419,24 @@ type Tx struct {
     driver.Tx
 }
 ```
+
+<a name="Warning"></a>
+## type Warning
+
+
+
+```go
+type Warning = query.Warning
+```
+
+<a name="ValidateOperationSpec"></a>
+### func ValidateOperationSpec
+
+```go
+func ValidateOperationSpec(spec OperationSpec, opts OperationOptions) ([]Warning, error)
+```
+
+
 
 <a name="WriteOpt"></a>
 ## type WriteOpt
@@ -819,6 +1727,906 @@ Tx wraps sql.Tx for transaction handling.
 type Tx struct{ *sql.Tx }
 ```
 
+# manifest
+
+```go
+import "github.com/faciam-dev/goquent/orm/manifest"
+```
+
+## Index
+
+- [Constants](<#constants>)
+- [func JSONSchema\(\) \(\[\]byte, error\)](<#JSONSchema>)
+- [func Validate\(m \*Manifest\) error](<#Validate>)
+- [func WriteJSON\(w io.Writer, m \*Manifest\) error](<#WriteJSON>)
+- [func WritePretty\(w io.Writer, m \*Manifest\) error](<#WritePretty>)
+- [func WriteVerificationJSON\(w io.Writer, v Verification\) error](<#WriteVerificationJSON>)
+- [func WriteVerificationPretty\(w io.Writer, v Verification\) error](<#WriteVerificationPretty>)
+- [type Column](<#Column>)
+- [type ColumnFlags](<#ColumnFlags>)
+- [type FreshnessCheck](<#FreshnessCheck>)
+- [type Index](<#Index>)
+- [type Manifest](<#Manifest>)
+  - [func AttachVerification\(m \*Manifest, v Verification\) \*Manifest](<#AttachVerification>)
+  - [func Generate\(opts Options\) \(\*Manifest, error\)](<#Generate>)
+  - [func Load\(path string\) \(\*Manifest, error\)](<#Load>)
+  - [func \(m \*Manifest\) ToJSON\(\) \(\[\]byte, error\)](<#Manifest.ToJSON>)
+- [type Options](<#Options>)
+- [type Policy](<#Policy>)
+- [type QueryExample](<#QueryExample>)
+- [type Relation](<#Relation>)
+- [type Table](<#Table>)
+- [type Verification](<#Verification>)
+  - [func Verify\(stored, current \*Manifest, checkedAt time.Time\) Verification](<#Verify>)
+
+
+## Constants
+
+<a name="Version"></a>
+
+```go
+const (
+    Version           = "1"
+    Generator         = "goquent"
+    WarningStale      = "MANIFEST_STALE"
+    WarningUnreadable = "MANIFEST_UNREADABLE"
+)
+```
+
+<a name="JSONSchema"></a>
+## func JSONSchema
+
+```go
+func JSONSchema() ([]byte, error)
+```
+
+JSONSchema returns a JSON Schema for manifest version 1.
+
+<a name="Validate"></a>
+## func Validate
+
+```go
+func Validate(m *Manifest) error
+```
+
+Validate checks the minimal versioned manifest contract.
+
+<a name="WriteJSON"></a>
+## func WriteJSON
+
+```go
+func WriteJSON(w io.Writer, m *Manifest) error
+```
+
+WriteJSON writes a stable manifest JSON document.
+
+<a name="WritePretty"></a>
+## func WritePretty
+
+```go
+func WritePretty(w io.Writer, m *Manifest) error
+```
+
+WritePretty writes a compact human\-readable manifest summary.
+
+<a name="WriteVerificationJSON"></a>
+## func WriteVerificationJSON
+
+```go
+func WriteVerificationJSON(w io.Writer, v Verification) error
+```
+
+WriteVerificationJSON writes a machine\-readable freshness result.
+
+<a name="WriteVerificationPretty"></a>
+## func WriteVerificationPretty
+
+```go
+func WriteVerificationPretty(w io.Writer, v Verification) error
+```
+
+WriteVerificationPretty writes freshness checks in a human\-readable form.
+
+<a name="Column"></a>
+## type Column
+
+Column describes a table column.
+
+```go
+type Column struct {
+    Name           string   `json:"name"`
+    Type           string   `json:"type,omitempty"`
+    Primary        bool     `json:"primary,omitempty"`
+    Nullable       bool     `json:"nullable"`
+    Default        string   `json:"default,omitempty"`
+    Generated      bool     `json:"generated,omitempty"`
+    EnumValues     []string `json:"enum_values,omitempty"`
+    PII            bool     `json:"pii,omitempty"`
+    Forbidden      bool     `json:"forbidden,omitempty"`
+    TenantScope    bool     `json:"tenant_scope,omitempty"`
+    SoftDelete     bool     `json:"soft_delete,omitempty"`
+    RequiredFilter bool     `json:"required_filter,omitempty"`
+}
+```
+
+<a name="ColumnFlags"></a>
+## type ColumnFlags
+
+ColumnFlags is used only to keep policy fingerprints stable and compact.
+
+```go
+type ColumnFlags struct {
+    Name           string `json:"name"`
+    PII            bool   `json:"pii,omitempty"`
+    TenantScope    bool   `json:"tenant_scope,omitempty"`
+    SoftDelete     bool   `json:"soft_delete,omitempty"`
+    RequiredFilter bool   `json:"required_filter,omitempty"`
+}
+```
+
+<a name="FreshnessCheck"></a>
+## type FreshnessCheck
+
+FreshnessCheck describes one fingerprint comparison.
+
+```go
+type FreshnessCheck struct {
+    Name     string `json:"name"`
+    Status   string `json:"status"`
+    Expected string `json:"expected,omitempty"`
+    Actual   string `json:"actual,omitempty"`
+    Message  string `json:"message,omitempty"`
+}
+```
+
+<a name="Index"></a>
+## type Index
+
+Index describes a database index.
+
+```go
+type Index struct {
+    Name    string   `json:"name"`
+    Columns []string `json:"columns,omitempty"`
+    Unique  bool     `json:"unique,omitempty"`
+}
+```
+
+<a name="Manifest"></a>
+## type Manifest
+
+Manifest is the AI\-readable schema/policy export.
+
+```go
+type Manifest struct {
+    Version                  string        `json:"version"`
+    GeneratedAt              time.Time     `json:"generated_at"`
+    GeneratorVersion         string        `json:"generator_version"`
+    Dialect                  string        `json:"dialect,omitempty"`
+    SchemaFingerprint        string        `json:"schema_fingerprint,omitempty"`
+    PolicyFingerprint        string        `json:"policy_fingerprint,omitempty"`
+    GeneratedCodeFingerprint string        `json:"generated_code_fingerprint,omitempty"`
+    DatabaseFingerprint      string        `json:"database_fingerprint,omitempty"`
+    Tables                   []Table       `json:"tables,omitempty"`
+    Verification             *Verification `json:"verification,omitempty"`
+}
+```
+
+<a name="AttachVerification"></a>
+### func AttachVerification
+
+```go
+func AttachVerification(m *Manifest, v Verification) *Manifest
+```
+
+AttachVerification stores a freshness result on a copy of m.
+
+<a name="Generate"></a>
+### func Generate
+
+```go
+func Generate(opts Options) (*Manifest, error)
+```
+
+Generate builds a stable manifest from known schema/model/policy inputs.
+
+<a name="Load"></a>
+### func Load
+
+```go
+func Load(path string) (*Manifest, error)
+```
+
+Load reads a manifest JSON file.
+
+<a name="Manifest.ToJSON"></a>
+### func \(\*Manifest\) ToJSON
+
+```go
+func (m *Manifest) ToJSON() ([]byte, error)
+```
+
+ToJSON returns stable, indented JSON for the manifest.
+
+<a name="Options"></a>
+## type Options
+
+Options controls manifest generation.
+
+```go
+type Options struct {
+    Dialect            string
+    GeneratedAt        time.Time
+    GeneratorVersion   string
+    Models             []any
+    Schema             *migration.Schema
+    Policies           []query.TablePolicy
+    GeneratedCodePaths []string
+    DatabaseSchema     *migration.Schema
+}
+```
+
+<a name="Policy"></a>
+## type Policy
+
+Policy describes a manifest policy entry for a table.
+
+```go
+type Policy struct {
+    Type   string           `json:"type"`
+    Column string           `json:"column,omitempty"`
+    Mode   query.PolicyMode `json:"mode,omitempty"`
+}
+```
+
+<a name="QueryExample"></a>
+## type QueryExample
+
+QueryExample gives tools a safe query\-shape hint.
+
+```go
+type QueryExample struct {
+    Name        string   `json:"name"`
+    Operation   string   `json:"operation"`
+    Select      []string `json:"select,omitempty"`
+    RequiredBy  string   `json:"required_by,omitempty"`
+    Description string   `json:"description,omitempty"`
+}
+```
+
+<a name="Relation"></a>
+## type Relation
+
+Relation is reserved for relationship metadata.
+
+```go
+type Relation struct {
+    Name      string `json:"name"`
+    Type      string `json:"type,omitempty"`
+    Table     string `json:"table,omitempty"`
+    Column    string `json:"column,omitempty"`
+    RefTable  string `json:"ref_table,omitempty"`
+    RefColumn string `json:"ref_column,omitempty"`
+}
+```
+
+<a name="Table"></a>
+## type Table
+
+Table describes an application\-visible table/model.
+
+```go
+type Table struct {
+    Name          string         `json:"name"`
+    Model         string         `json:"model,omitempty"`
+    Columns       []Column       `json:"columns,omitempty"`
+    Indexes       []Index        `json:"indexes,omitempty"`
+    Relations     []Relation     `json:"relations,omitempty"`
+    Policies      []Policy       `json:"policies,omitempty"`
+    QueryExamples []QueryExample `json:"query_examples,omitempty"`
+}
+```
+
+<a name="Verification"></a>
+## type Verification
+
+Verification reports whether a manifest matches current inputs.
+
+```go
+type Verification struct {
+    Fresh     bool             `json:"fresh"`
+    CheckedAt time.Time        `json:"checked_at"`
+    Checks    []FreshnessCheck `json:"checks,omitempty"`
+}
+```
+
+<a name="Verify"></a>
+### func Verify
+
+```go
+func Verify(stored, current *Manifest, checkedAt time.Time) Verification
+```
+
+Verify compares a stored manifest with a freshly generated one.
+
+# mcp
+
+```go
+import "github.com/faciam-dev/goquent/orm/mcp"
+```
+
+## Index
+
+- [Constants](<#constants>)
+- [type Content](<#Content>)
+- [type Options](<#Options>)
+- [type Prompt](<#Prompt>)
+- [type PromptArgument](<#PromptArgument>)
+- [type PromptMessage](<#PromptMessage>)
+- [type Resource](<#Resource>)
+- [type Server](<#Server>)
+  - [func NewServer\(opts Options\) \*Server](<#NewServer>)
+  - [func \(s \*Server\) CallTool\(ctx context.Context, name string, args map\[string\]any\) \(ToolResult, error\)](<#Server.CallTool>)
+  - [func \(s \*Server\) GetPrompt\(name string, args map\[string\]any\) \(\[\]PromptMessage, error\)](<#Server.GetPrompt>)
+  - [func \(s \*Server\) HandleJSONRPC\(ctx context.Context, payload \[\]byte\) \(\[\]byte, bool\)](<#Server.HandleJSONRPC>)
+  - [func \(s \*Server\) Prompts\(\) \[\]Prompt](<#Server.Prompts>)
+  - [func \(s \*Server\) ReadResource\(uri string\) \(string, string, error\)](<#Server.ReadResource>)
+  - [func \(s \*Server\) Resources\(\) \[\]Resource](<#Server.Resources>)
+  - [func \(s \*Server\) Serve\(ctx context.Context, r io.Reader, w io.Writer\) error](<#Server.Serve>)
+  - [func \(s \*Server\) Tools\(\) \[\]Tool](<#Server.Tools>)
+- [type Tool](<#Tool>)
+- [type ToolResult](<#ToolResult>)
+
+
+## Constants
+
+<a name="ProtocolVersion"></a>
+
+```go
+const (
+    ProtocolVersion = "2024-11-05"
+    ServerName      = "goquent"
+    ServerVersion   = "0.1.0"
+)
+```
+
+<a name="Content"></a>
+## type Content
+
+Content is text content returned by tools/prompts/resources.
+
+```go
+type Content struct {
+    Type string `json:"type"`
+    Text string `json:"text"`
+}
+```
+
+<a name="Options"></a>
+## type Options
+
+Options configures the read\-only MCP server.
+
+```go
+type Options struct {
+    Manifest  *manifest.Manifest
+    Resources []string
+    Tools     []string
+    Prompts   []string
+}
+```
+
+<a name="Prompt"></a>
+## type Prompt
+
+Prompt describes an MCP prompt template.
+
+```go
+type Prompt struct {
+    Name        string           `json:"name"`
+    Description string           `json:"description,omitempty"`
+    Arguments   []PromptArgument `json:"arguments,omitempty"`
+}
+```
+
+<a name="PromptArgument"></a>
+## type PromptArgument
+
+PromptArgument describes a prompt parameter.
+
+```go
+type PromptArgument struct {
+    Name        string `json:"name"`
+    Description string `json:"description,omitempty"`
+    Required    bool   `json:"required,omitempty"`
+}
+```
+
+<a name="PromptMessage"></a>
+## type PromptMessage
+
+PromptMessage is returned by prompts/get.
+
+```go
+type PromptMessage struct {
+    Role    string  `json:"role"`
+    Content Content `json:"content"`
+}
+```
+
+<a name="Resource"></a>
+## type Resource
+
+Resource describes an MCP resource.
+
+```go
+type Resource struct {
+    URI         string `json:"uri"`
+    Name        string `json:"name"`
+    Description string `json:"description,omitempty"`
+    MimeType    string `json:"mimeType,omitempty"`
+}
+```
+
+<a name="Server"></a>
+## type Server
+
+Server exposes Goquent schema, review, and planning helpers through MCP.
+
+```go
+type Server struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewServer"></a>
+### func NewServer
+
+```go
+func NewServer(opts Options) *Server
+```
+
+NewServer creates a read\-only MCP server.
+
+<a name="Server.CallTool"></a>
+### func \(\*Server\) CallTool
+
+```go
+func (s *Server) CallTool(ctx context.Context, name string, args map[string]any) (ToolResult, error)
+```
+
+CallTool executes a read\-only MCP tool.
+
+<a name="Server.GetPrompt"></a>
+### func \(\*Server\) GetPrompt
+
+```go
+func (s *Server) GetPrompt(name string, args map[string]any) ([]PromptMessage, error)
+```
+
+GetPrompt returns a prompt body.
+
+<a name="Server.HandleJSONRPC"></a>
+### func \(\*Server\) HandleJSONRPC
+
+```go
+func (s *Server) HandleJSONRPC(ctx context.Context, payload []byte) ([]byte, bool)
+```
+
+HandleJSONRPC handles one JSON\-RPC request payload.
+
+<a name="Server.Prompts"></a>
+### func \(\*Server\) Prompts
+
+```go
+func (s *Server) Prompts() []Prompt
+```
+
+Prompts lists prompt templates.
+
+<a name="Server.ReadResource"></a>
+### func \(\*Server\) ReadResource
+
+```go
+func (s *Server) ReadResource(uri string) (string, string, error)
+```
+
+ReadResource returns a resource body.
+
+<a name="Server.Resources"></a>
+### func \(\*Server\) Resources
+
+```go
+func (s *Server) Resources() []Resource
+```
+
+Resources lists read\-only Goquent resources.
+
+<a name="Server.Serve"></a>
+### func \(\*Server\) Serve
+
+```go
+func (s *Server) Serve(ctx context.Context, r io.Reader, w io.Writer) error
+```
+
+Serve runs a minimal MCP stdio JSON\-RPC server.
+
+<a name="Server.Tools"></a>
+### func \(\*Server\) Tools
+
+```go
+func (s *Server) Tools() []Tool
+```
+
+Tools lists read\-only MCP tools.
+
+<a name="Tool"></a>
+## type Tool
+
+Tool describes an MCP tool.
+
+```go
+type Tool struct {
+    Name        string         `json:"name"`
+    Description string         `json:"description,omitempty"`
+    InputSchema map[string]any `json:"inputSchema"`
+}
+```
+
+<a name="ToolResult"></a>
+## type ToolResult
+
+ToolResult is an MCP tool result.
+
+```go
+type ToolResult struct {
+    Content []Content `json:"content"`
+    IsError bool      `json:"isError,omitempty"`
+}
+```
+
+# migration
+
+```go
+import "github.com/faciam-dev/goquent/orm/migration"
+```
+
+## Index
+
+- [Constants](<#constants>)
+- [func EnsureExecutable\(plan \*MigrationPlan\) error](<#EnsureExecutable>)
+- [func WriteJSON\(w io.Writer, plan \*MigrationPlan\) error](<#WriteJSON>)
+- [func WritePretty\(w io.Writer, plan \*MigrationPlan\) error](<#WritePretty>)
+- [type ColumnSchema](<#ColumnSchema>)
+- [type Executor](<#Executor>)
+- [type IndexSchema](<#IndexSchema>)
+- [type MigrationPlan](<#MigrationPlan>)
+  - [func DiffSchemas\(current, desired Schema\) \*MigrationPlan](<#DiffSchemas>)
+  - [func PlanSQL\(sqlText string\) \(\*MigrationPlan, error\)](<#PlanSQL>)
+  - [func PlanSteps\(steps \[\]MigrationStep\) \*MigrationPlan](<#PlanSteps>)
+  - [func \(p \*MigrationPlan\) RequiresApproval\(\) bool](<#MigrationPlan.RequiresApproval>)
+  - [func \(p \*MigrationPlan\) String\(\) string](<#MigrationPlan.String>)
+  - [func \(p \*MigrationPlan\) ToJSON\(\) \(\[\]byte, error\)](<#MigrationPlan.ToJSON>)
+- [type MigrationStatement](<#MigrationStatement>)
+- [type MigrationStep](<#MigrationStep>)
+- [type MigrationStepType](<#MigrationStepType>)
+- [type Migrator](<#Migrator>)
+  - [func New\(sqlText string\) \*Migrator](<#New>)
+  - [func \(m \*Migrator\) Apply\(ctx context.Context, exec Executor\) \(\*MigrationPlan, error\)](<#Migrator.Apply>)
+  - [func \(m \*Migrator\) DryRun\(ctx context.Context\) \(\*MigrationPlan, error\)](<#Migrator.DryRun>)
+  - [func \(m \*Migrator\) Plan\(ctx context.Context\) \(\*MigrationPlan, error\)](<#Migrator.Plan>)
+  - [func \(m \*Migrator\) RequireApproval\(reason string\) \*Migrator](<#Migrator.RequireApproval>)
+- [type Schema](<#Schema>)
+- [type TableSchema](<#TableSchema>)
+
+
+## Constants
+
+<a name="WarningMigrationUnsupported"></a>
+
+```go
+const (
+    WarningMigrationUnsupported           = "MIGRATION_UNSUPPORTED"
+    WarningMigrationDropTable             = "MIGRATION_DROP_TABLE"
+    WarningMigrationDropColumn            = "MIGRATION_DROP_COLUMN"
+    WarningMigrationAddNotNullColumn      = "MIGRATION_ADD_NOT_NULL_COLUMN"
+    WarningMigrationRenameColumn          = "MIGRATION_RENAME_COLUMN"
+    WarningMigrationAlterColumnType       = "MIGRATION_ALTER_COLUMN_TYPE"
+    WarningMigrationTypeNarrowing         = "MIGRATION_TYPE_NARROWING"
+    WarningMigrationSetNotNull            = "MIGRATION_SET_NOT_NULL"
+    WarningMigrationAddIndexNonConcurrent = "MIGRATION_ADD_INDEX_NON_CONCURRENT"
+    WarningMigrationDropIndex             = "MIGRATION_DROP_INDEX"
+)
+```
+
+<a name="EnsureExecutable"></a>
+## func EnsureExecutable
+
+```go
+func EnsureExecutable(plan *MigrationPlan) error
+```
+
+EnsureExecutable enforces migration approval requirements before execution.
+
+<a name="WriteJSON"></a>
+## func WriteJSON
+
+```go
+func WriteJSON(w io.Writer, plan *MigrationPlan) error
+```
+
+WriteJSON writes a machine\-readable migration plan.
+
+<a name="WritePretty"></a>
+## func WritePretty
+
+```go
+func WritePretty(w io.Writer, plan *MigrationPlan) error
+```
+
+WritePretty writes a human\-readable migration plan.
+
+<a name="ColumnSchema"></a>
+## type ColumnSchema
+
+ColumnSchema describes a column in a schema diff.
+
+```go
+type ColumnSchema struct {
+    Name              string `json:"name"`
+    Type              string `json:"type,omitempty"`
+    Nullable          bool   `json:"nullable"`
+    HasDefault        bool   `json:"has_default,omitempty"`
+    DefaultExpression string `json:"default_expression,omitempty"`
+}
+```
+
+<a name="Executor"></a>
+## type Executor
+
+Executor is the minimal execution surface used by Apply.
+
+```go
+type Executor interface {
+    ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+```
+
+<a name="IndexSchema"></a>
+## type IndexSchema
+
+IndexSchema describes an index in a schema diff.
+
+```go
+type IndexSchema struct {
+    Name       string   `json:"name"`
+    Columns    []string `json:"columns,omitempty"`
+    Unique     bool     `json:"unique,omitempty"`
+    Concurrent bool     `json:"concurrent,omitempty"`
+}
+```
+
+<a name="MigrationPlan"></a>
+## type MigrationPlan
+
+MigrationPlan explains a schema migration before it is applied.
+
+```go
+type MigrationPlan struct {
+    SQL               string                  `json:"sql"`
+    Statements        []MigrationStatement    `json:"statements,omitempty"`
+    Steps             []MigrationStep         `json:"steps,omitempty"`
+    RiskLevel         query.RiskLevel         `json:"risk_level"`
+    Warnings          []query.Warning         `json:"warnings,omitempty"`
+    RequiredApproval  bool                    `json:"required_approval"`
+    Blocked           bool                    `json:"blocked,omitempty"`
+    Approval          *query.Approval         `json:"approval,omitempty"`
+    AnalysisPrecision query.AnalysisPrecision `json:"analysis_precision"`
+    Metadata          map[string]any          `json:"metadata,omitempty"`
+}
+```
+
+<a name="DiffSchemas"></a>
+### func DiffSchemas
+
+```go
+func DiffSchemas(current, desired Schema) *MigrationPlan
+```
+
+DiffSchemas creates a migration plan that transforms current into desired.
+
+<a name="PlanSQL"></a>
+### func PlanSQL
+
+```go
+func PlanSQL(sqlText string) (*MigrationPlan, error)
+```
+
+PlanSQL builds a migration plan from raw migration SQL.
+
+<a name="PlanSteps"></a>
+### func PlanSteps
+
+```go
+func PlanSteps(steps []MigrationStep) *MigrationPlan
+```
+
+PlanSteps builds a MigrationPlan from structured steps.
+
+<a name="MigrationPlan.RequiresApproval"></a>
+### func \(\*MigrationPlan\) RequiresApproval
+
+```go
+func (p *MigrationPlan) RequiresApproval() bool
+```
+
+RequiresApproval reports whether this migration needs an explicit approval reason.
+
+<a name="MigrationPlan.String"></a>
+### func \(\*MigrationPlan\) String
+
+```go
+func (p *MigrationPlan) String() string
+```
+
+String returns a compact human\-readable migration summary.
+
+<a name="MigrationPlan.ToJSON"></a>
+### func \(\*MigrationPlan\) ToJSON
+
+```go
+func (p *MigrationPlan) ToJSON() ([]byte, error)
+```
+
+ToJSON returns stable, indented JSON for the migration plan.
+
+<a name="MigrationStatement"></a>
+## type MigrationStatement
+
+MigrationStatement is one executable SQL statement in a migration plan.
+
+```go
+type MigrationStatement struct {
+    SQL  string `json:"sql"`
+    Line int    `json:"line,omitempty"`
+}
+```
+
+<a name="MigrationStep"></a>
+## type MigrationStep
+
+MigrationStep describes one schema change extracted from migration SQL.
+
+```go
+type MigrationStep struct {
+    Type              MigrationStepType       `json:"type"`
+    Table             string                  `json:"table,omitempty"`
+    Column            string                  `json:"column,omitempty"`
+    FromName          string                  `json:"from_name,omitempty"`
+    ToName            string                  `json:"to_name,omitempty"`
+    Index             string                  `json:"index,omitempty"`
+    ColumnType        string                  `json:"column_type,omitempty"`
+    OldType           string                  `json:"old_type,omitempty"`
+    NewType           string                  `json:"new_type,omitempty"`
+    Nullable          *bool                   `json:"nullable,omitempty"`
+    HasDefault        bool                    `json:"has_default,omitempty"`
+    DefaultExpression string                  `json:"default_expression,omitempty"`
+    Concurrent        bool                    `json:"concurrent,omitempty"`
+    SQL               string                  `json:"sql,omitempty"`
+    Line              int                     `json:"line,omitempty"`
+    RiskLevel         query.RiskLevel         `json:"risk_level"`
+    Warnings          []query.Warning         `json:"warnings,omitempty"`
+    Preflight         []string                `json:"preflight,omitempty"`
+    AnalysisPrecision query.AnalysisPrecision `json:"analysis_precision"`
+}
+```
+
+<a name="MigrationStepType"></a>
+## type MigrationStepType
+
+MigrationStepType classifies a structural schema migration step.
+
+```go
+type MigrationStepType string
+```
+
+<a name="AddTable"></a>
+
+```go
+const (
+    AddTable         MigrationStepType = "add_table"
+    DropTable        MigrationStepType = "drop_table"
+    AddColumn        MigrationStepType = "add_column"
+    DropColumn       MigrationStepType = "drop_column"
+    RenameColumn     MigrationStepType = "rename_column"
+    AlterColumnType  MigrationStepType = "alter_column_type"
+    AlterNullability MigrationStepType = "alter_nullability"
+    AddIndex         MigrationStepType = "add_index"
+    DropIndex        MigrationStepType = "drop_index"
+    UnsupportedStep  MigrationStepType = "unsupported"
+)
+```
+
+<a name="Migrator"></a>
+## type Migrator
+
+Migrator builds and optionally applies a migration plan.
+
+```go
+type Migrator struct {
+    // contains filtered or unexported fields
+}
+```
+
+<a name="New"></a>
+### func New
+
+```go
+func New(sqlText string) *Migrator
+```
+
+New creates a migration planner for SQL text.
+
+<a name="Migrator.Apply"></a>
+### func \(\*Migrator\) Apply
+
+```go
+func (m *Migrator) Apply(ctx context.Context, exec Executor) (*MigrationPlan, error)
+```
+
+Apply validates and executes migration statements sequentially.
+
+<a name="Migrator.DryRun"></a>
+### func \(\*Migrator\) DryRun
+
+```go
+func (m *Migrator) DryRun(ctx context.Context) (*MigrationPlan, error)
+```
+
+DryRun builds and validates the migration plan without executing it.
+
+<a name="Migrator.Plan"></a>
+### func \(\*Migrator\) Plan
+
+```go
+func (m *Migrator) Plan(ctx context.Context) (*MigrationPlan, error)
+```
+
+Plan builds a migration plan without executing it.
+
+<a name="Migrator.RequireApproval"></a>
+### func \(\*Migrator\) RequireApproval
+
+```go
+func (m *Migrator) RequireApproval(reason string) *Migrator
+```
+
+RequireApproval records an explicit reason for applying a risky migration.
+
+<a name="Schema"></a>
+## type Schema
+
+Schema is a minimal desired/current schema representation for diff planning.
+
+```go
+type Schema struct {
+    Tables []TableSchema `json:"tables,omitempty"`
+}
+```
+
+<a name="TableSchema"></a>
+## type TableSchema
+
+TableSchema describes a table in a schema diff.
+
+```go
+type TableSchema struct {
+    Name    string         `json:"name"`
+    Columns []ColumnSchema `json:"columns,omitempty"`
+    Indexes []IndexSchema  `json:"indexes,omitempty"`
+}
+```
+
 # model
 
 ```go
@@ -839,6 +2647,156 @@ func TableName(v any) string
 
 TableName returns the table name for the given value.
 
+# operation
+
+```go
+import "github.com/faciam-dev/goquent/orm/operation"
+```
+
+## Index
+
+- [Constants](<#constants>)
+- [Variables](<#variables>)
+- [func Compile\(ctx context.Context, spec OperationSpec, opts Options\) \(\*query.QueryPlan, error\)](<#Compile>)
+- [func JSONSchema\(\) \(\[\]byte, error\)](<#JSONSchema>)
+- [func Validate\(spec OperationSpec, opts Options\) \(\[\]query.Warning, error\)](<#Validate>)
+- [type FilterSpec](<#FilterSpec>)
+- [type OperationSpec](<#OperationSpec>)
+  - [func \(s \*OperationSpec\) UnmarshalJSON\(b \[\]byte\) error](<#OperationSpec.UnmarshalJSON>)
+- [type Options](<#Options>)
+- [type OrderSpec](<#OrderSpec>)
+
+
+## Constants
+
+<a name="OperationSelect"></a>
+
+```go
+const (
+    OperationSelect = "select"
+
+    WarningOperationPIISelected    = "OPERATION_SPEC_PII_SELECTED"
+    WarningOperationRequiredFilter = "OPERATION_SPEC_REQUIRED_FILTER_MISSING"
+    WarningOperationMissingLimit   = query.WarningLimitMissing
+    WarningOperationStaleManifest  = manifest.WarningStale
+)
+```
+
+## Variables
+
+<a name="ErrManifestRequired"></a>
+
+```go
+var (
+    ErrManifestRequired        = errors.New("goquent operation: manifest is required")
+    ErrUnsupportedOperation    = errors.New("goquent operation: unsupported operation")
+    ErrModelRequired           = errors.New("goquent operation: model is required")
+    ErrUnknownModel            = errors.New("goquent operation: unknown model")
+    ErrSelectRequired          = errors.New("goquent operation: explicit select fields are required")
+    ErrUnknownField            = errors.New("goquent operation: unknown field")
+    ErrForbiddenField          = errors.New("goquent operation: forbidden field")
+    ErrInvalidFilter           = errors.New("goquent operation: invalid filter")
+    ErrInvalidOrder            = errors.New("goquent operation: invalid order")
+    ErrRequiredFilterMissing   = errors.New("goquent operation: required filter missing")
+    ErrPIIAccessReasonRequired = errors.New("goquent operation: PII access reason required")
+    ErrStaleManifest           = errors.New("goquent operation: stale manifest")
+)
+```
+
+<a name="Compile"></a>
+## func Compile
+
+```go
+func Compile(ctx context.Context, spec OperationSpec, opts Options) (*query.QueryPlan, error)
+```
+
+Compile validates spec and compiles it to a read\-only QueryPlan.
+
+<a name="JSONSchema"></a>
+## func JSONSchema
+
+```go
+func JSONSchema() ([]byte, error)
+```
+
+JSONSchema returns the OperationSpec MVP JSON Schema.
+
+<a name="Validate"></a>
+## func Validate
+
+```go
+func Validate(spec OperationSpec, opts Options) ([]query.Warning, error)
+```
+
+Validate checks an OperationSpec against a manifest and policy metadata.
+
+<a name="FilterSpec"></a>
+## type FilterSpec
+
+FilterSpec describes a single field predicate.
+
+```go
+type FilterSpec struct {
+    Field    string `json:"field"`
+    Op       string `json:"op"`
+    Value    any    `json:"value,omitempty"`
+    ValueRef string `json:"value_ref,omitempty"`
+}
+```
+
+<a name="OperationSpec"></a>
+## type OperationSpec
+
+OperationSpec is the read\-only structured interface for AI\-generated DB intent.
+
+```go
+type OperationSpec struct {
+    Operation    string       `json:"operation"`
+    Model        string       `json:"model"`
+    Select       []string     `json:"select,omitempty"`
+    Filters      []FilterSpec `json:"filters,omitempty"`
+    OrderBy      []OrderSpec  `json:"order_by,omitempty"`
+    Limit        *int64       `json:"limit,omitempty"`
+    AccessReason string       `json:"access_reason,omitempty"`
+}
+```
+
+<a name="OperationSpec.UnmarshalJSON"></a>
+### func \(\*OperationSpec\) UnmarshalJSON
+
+```go
+func (s *OperationSpec) UnmarshalJSON(b []byte) error
+```
+
+UnmarshalJSON rejects non\-MVP fields such as join, aggregate, mutation, or raw SQL hints.
+
+<a name="Options"></a>
+## type Options
+
+Options controls validation and compilation.
+
+```go
+type Options struct {
+    Manifest             *manifest.Manifest
+    Dialect              driver.Dialect
+    Values               map[string]any
+    RequireFreshManifest bool
+    AccessReason         string
+}
+```
+
+<a name="OrderSpec"></a>
+## type OrderSpec
+
+OrderSpec describes a single ordering term.
+
+```go
+type OrderSpec struct {
+    Field     string `json:"field"`
+    Direction string `json:"direction"`
+}
+```
+
 # query
 
 ```go
@@ -847,8 +2805,22 @@ import "github.com/faciam-dev/goquent/orm/query"
 
 ## Index
 
+- [Constants](<#constants>)
+- [Variables](<#variables>)
+- [func EnsurePlanExecutable\(plan \*QueryPlan\) error](<#EnsurePlanExecutable>)
+- [func RegisterTablePolicy\(policy TablePolicy\) error](<#RegisterTablePolicy>)
+- [func ResetPolicyRegistry\(\)](<#ResetPolicyRegistry>)
+- [type AnalysisPrecision](<#AnalysisPrecision>)
+- [type Approval](<#Approval>)
+- [type ColumnRef](<#ColumnRef>)
+- [type Evidence](<#Evidence>)
+- [type JoinRef](<#JoinRef>)
+- [type OperationType](<#OperationType>)
+- [type PolicyMode](<#PolicyMode>)
+- [type PredicateRef](<#PredicateRef>)
 - [type Query](<#Query>)
   - [func New\(exec executor, table string, dialect driver.Dialect\) \*Query](<#New>)
+  - [func \(q \*Query\) AccessReason\(reason string\) \*Query](<#Query.AccessReason>)
   - [func \(q \*Query\) Avg\(col string\) \*Query](<#Query.Avg>)
   - [func \(q \*Query\) Build\(\) \(string, \[\]any, error\)](<#Query.Build>)
   - [func \(q \*Query\) Count\(cols ...string\) \(int64, error\)](<#Query.Count>)
@@ -881,6 +2853,7 @@ import "github.com/faciam-dev/goquent/orm/query"
   - [func \(q \*Query\) Max\(col string\) \*Query](<#Query.Max>)
   - [func \(q \*Query\) Min\(col string\) \*Query](<#Query.Min>)
   - [func \(q \*Query\) Offset\(n int\) \*Query](<#Query.Offset>)
+  - [func \(q \*Query\) OnlyDeleted\(\) \*Query](<#Query.OnlyDeleted>)
   - [func \(q \*Query\) OrHaving\(col, cond string, val any\) \*Query](<#Query.OrHaving>)
   - [func \(q \*Query\) OrHavingRaw\(raw string\) \*Query](<#Query.OrHavingRaw>)
   - [func \(q \*Query\) OrWhere\(col string, args ...any\) \*Query](<#Query.OrWhere>)
@@ -909,9 +2882,15 @@ import "github.com/faciam-dev/goquent/orm/query"
   - [func \(q \*Query\) OrWhereYear\(col, cond, year string\) \*Query](<#Query.OrWhereYear>)
   - [func \(q \*Query\) OrderBy\(col, dir string\) \*Query](<#Query.OrderBy>)
   - [func \(q \*Query\) OrderByRaw\(raw string\) \*Query](<#Query.OrderByRaw>)
+  - [func \(q \*Query\) Plan\(ctx context.Context\) \(\*QueryPlan, error\)](<#Query.Plan>)
+  - [func \(q \*Query\) PlanDelete\(ctx context.Context\) \(\*QueryPlan, error\)](<#Query.PlanDelete>)
+  - [func \(q \*Query\) PlanInsert\(ctx context.Context, data any\) \(\*QueryPlan, error\)](<#Query.PlanInsert>)
+  - [func \(q \*Query\) PlanInsertBatch\(ctx context.Context, data \[\]map\[string\]any\) \(\*QueryPlan, error\)](<#Query.PlanInsertBatch>)
+  - [func \(q \*Query\) PlanUpdate\(ctx context.Context, data any\) \(\*QueryPlan, error\)](<#Query.PlanUpdate>)
   - [func \(q \*Query\) PrimaryKey\(col string\) \*Query](<#Query.PrimaryKey>)
   - [func \(q \*Query\) RawSQL\(\) \(string, error\)](<#Query.RawSQL>)
   - [func \(q \*Query\) ReOrder\(\) \*Query](<#Query.ReOrder>)
+  - [func \(q \*Query\) RequireApproval\(reason string\) \*Query](<#Query.RequireApproval>)
   - [func \(q \*Query\) RightJoin\(table, localColumn, cond, target string\) \*Query](<#Query.RightJoin>)
   - [func \(q \*Query\) RightJoinQuery\(table string, fn func\(b \*qbapi.JoinClauseQueryBuilder\)\) \*Query](<#Query.RightJoinQuery>)
   - [func \(q \*Query\) RightJoinSubQuery\(sub \*Query, alias, my, condition, target string\) \*Query](<#Query.RightJoinSubQuery>)
@@ -922,6 +2901,7 @@ import "github.com/faciam-dev/goquent/orm/query"
   - [func \(q \*Query\) SharedLock\(\) \*Query](<#Query.SharedLock>)
   - [func \(q \*Query\) Skip\(n int\) \*Query](<#Query.Skip>)
   - [func \(q \*Query\) Sum\(col string\) \*Query](<#Query.Sum>)
+  - [func \(q \*Query\) SuppressWarning\(code, reason string, opts ...SuppressionOption\) \*Query](<#Query.SuppressWarning>)
   - [func \(q \*Query\) Take\(n int\) \*Query](<#Query.Take>)
   - [func \(q \*Query\) Union\(sub \*Query\) \*Query](<#Query.Union>)
   - [func \(q \*Query\) UnionAll\(sub \*Query\) \*Query](<#Query.UnionAll>)
@@ -955,7 +2935,245 @@ import "github.com/faciam-dev/goquent/orm/query"
   - [func \(q \*Query\) WhereTime\(col, cond, time string\) \*Query](<#Query.WhereTime>)
   - [func \(q \*Query\) WhereYear\(col, cond, year string\) \*Query](<#Query.WhereYear>)
   - [func \(q \*Query\) WithContext\(ctx context.Context\) \*Query](<#Query.WithContext>)
+  - [func \(q \*Query\) WithDeleted\(\) \*Query](<#Query.WithDeleted>)
+- [type QueryPlan](<#QueryPlan>)
+  - [func NewRawPlan\(sqlStr string, args ...any\) \*QueryPlan](<#NewRawPlan>)
+  - [func \(p \*QueryPlan\) RequiresApproval\(\) bool](<#QueryPlan.RequiresApproval>)
+  - [func \(p \*QueryPlan\) String\(\) string](<#QueryPlan.String>)
+  - [func \(p \*QueryPlan\) ToJSON\(\) \(\[\]byte, error\)](<#QueryPlan.ToJSON>)
+- [type RiskConfig](<#RiskConfig>)
+- [type RiskEngine](<#RiskEngine>)
+  - [func NewRiskEngine\(config RiskConfig\) RiskEngine](<#NewRiskEngine>)
+- [type RiskLevel](<#RiskLevel>)
+- [type RiskResult](<#RiskResult>)
+- [type RiskRuleConfig](<#RiskRuleConfig>)
+- [type SourceLocation](<#SourceLocation>)
+- [type Suppression](<#Suppression>)
+  - [func NewSuppression\(code, reason string, opts ...SuppressionOption\) \(Suppression, error\)](<#NewSuppression>)
+  - [func ParseInlineSuppression\(comment string\) \(Suppression, bool, error\)](<#ParseInlineSuppression>)
+- [type SuppressionOption](<#SuppressionOption>)
+  - [func SuppressionExpiresAt\(t time.Time\) SuppressionOption](<#SuppressionExpiresAt>)
+  - [func SuppressionOwner\(owner string\) SuppressionOption](<#SuppressionOwner>)
+- [type SuppressionScope](<#SuppressionScope>)
+- [type TablePolicy](<#TablePolicy>)
+  - [func PolicyForTable\(table string\) \(TablePolicy, bool\)](<#PolicyForTable>)
+  - [func RegisteredTablePolicies\(\) \[\]TablePolicy](<#RegisteredTablePolicies>)
+- [type TableRef](<#TableRef>)
+- [type Warning](<#Warning>)
 
+
+## Constants
+
+<a name="WarningUpdateWithoutWhere"></a>
+
+```go
+const (
+    WarningUpdateWithoutWhere      = "UPDATE_WITHOUT_WHERE"
+    WarningDeleteWithoutWhere      = "DELETE_WITHOUT_WHERE"
+    WarningSelectStarUsed          = "SELECT_STAR_USED"
+    WarningLimitMissing            = "LIMIT_MISSING"
+    WarningRawSQLUsed              = "RAW_SQL_USED"
+    WarningBulkUpdateDetected      = "BULK_UPDATE_DETECTED"
+    WarningBulkDeleteDetected      = "BULK_DELETE_DETECTED"
+    WarningDestructiveSQL          = "DESTRUCTIVE_SQL_DETECTED"
+    WarningWeakPredicate           = "WEAK_PREDICATE"
+    WarningSuppressionExpired      = "SUPPRESSION_EXPIRED"
+    WarningSuppressionNotAllowed   = "SUPPRESSION_NOT_ALLOWED"
+    WarningStaticReviewPartial     = "STATIC_REVIEW_PARTIAL"
+    WarningStaticReviewUnsupported = "STATIC_REVIEW_UNSUPPORTED"
+)
+```
+
+<a name="WarningTenantFilterMissing"></a>
+
+```go
+const (
+    WarningTenantFilterMissing     = "TENANT_FILTER_MISSING"
+    WarningSoftDeleteFilterMissing = "SOFT_DELETE_FILTER_MISSING"
+    WarningPIIColumnSelected       = "PII_COLUMN_SELECTED"
+    WarningRequiredFilterMissing   = "REQUIRED_FILTER_MISSING"
+)
+```
+
+## Variables
+
+<a name="ErrApprovalRequired"></a>
+
+```go
+var (
+    ErrApprovalRequired       = errors.New("goquent: approval required")
+    ErrApprovalReasonRequired = errors.New("goquent: approval reason required")
+    ErrAccessReasonRequired   = errors.New("goquent: access reason required")
+    ErrBlockedOperation       = errors.New("goquent: blocked operation")
+)
+```
+
+<a name="EnsurePlanExecutable"></a>
+## func EnsurePlanExecutable
+
+```go
+func EnsurePlanExecutable(plan *QueryPlan) error
+```
+
+EnsurePlanExecutable enforces approval and block rules for a finalized plan.
+
+<a name="RegisterTablePolicy"></a>
+## func RegisterTablePolicy
+
+```go
+func RegisterTablePolicy(policy TablePolicy) error
+```
+
+RegisterTablePolicy registers or replaces a table policy.
+
+<a name="ResetPolicyRegistry"></a>
+## func ResetPolicyRegistry
+
+```go
+func ResetPolicyRegistry()
+```
+
+ResetPolicyRegistry clears registered policies. Intended for tests.
+
+<a name="AnalysisPrecision"></a>
+## type AnalysisPrecision
+
+AnalysisPrecision describes how precisely Goquent could explain a query.
+
+```go
+type AnalysisPrecision string
+```
+
+<a name="AnalysisPrecise"></a>
+
+```go
+const (
+    AnalysisPrecise     AnalysisPrecision = "precise"
+    AnalysisPartial     AnalysisPrecision = "partial"
+    AnalysisUnsupported AnalysisPrecision = "unsupported"
+)
+```
+
+<a name="Approval"></a>
+## type Approval
+
+Approval records an explicit approval reason for a risky operation.
+
+```go
+type Approval struct {
+    Reason    string     `json:"reason"`
+    Scope     string     `json:"scope,omitempty"`
+    CreatedBy string     `json:"created_by,omitempty"`
+    CreatedAt time.Time  `json:"created_at,omitempty"`
+    ExpiresAt *time.Time `json:"expires_at,omitempty"`
+}
+```
+
+<a name="ColumnRef"></a>
+## type ColumnRef
+
+ColumnRef describes a selected, inserted, or updated column.
+
+```go
+type ColumnRef struct {
+    Table      string `json:"table,omitempty"`
+    Name       string `json:"name,omitempty"`
+    Expression string `json:"expression,omitempty"`
+    Raw        bool   `json:"raw,omitempty"`
+    Distinct   bool   `json:"distinct,omitempty"`
+    Count      bool   `json:"count,omitempty"`
+    Function   string `json:"function,omitempty"`
+}
+```
+
+<a name="Evidence"></a>
+## type Evidence
+
+Evidence stores machine\-readable supporting details for a warning.
+
+```go
+type Evidence struct {
+    Key   string `json:"key"`
+    Value any    `json:"value,omitempty"`
+}
+```
+
+<a name="JoinRef"></a>
+## type JoinRef
+
+JoinRef describes a JOIN visible in the query builder metadata.
+
+```go
+type JoinRef struct {
+    Type        string `json:"type,omitempty"`
+    Table       string `json:"table,omitempty"`
+    Alias       string `json:"alias,omitempty"`
+    LeftColumn  string `json:"left_column,omitempty"`
+    Operator    string `json:"operator,omitempty"`
+    RightColumn string `json:"right_column,omitempty"`
+    Subquery    bool   `json:"subquery,omitempty"`
+}
+```
+
+<a name="OperationType"></a>
+## type OperationType
+
+OperationType describes the structural SQL operation represented by a plan.
+
+```go
+type OperationType string
+```
+
+<a name="OperationSelect"></a>
+
+```go
+const (
+    OperationSelect OperationType = "select"
+    OperationInsert OperationType = "insert"
+    OperationUpdate OperationType = "update"
+    OperationDelete OperationType = "delete"
+    OperationRaw    OperationType = "raw"
+)
+```
+
+<a name="PolicyMode"></a>
+## type PolicyMode
+
+PolicyMode controls how policy violations are represented in a QueryPlan.
+
+```go
+type PolicyMode string
+```
+
+<a name="PolicyModeWarn"></a>
+
+```go
+const (
+    PolicyModeWarn    PolicyMode = "warn"
+    PolicyModeEnforce PolicyMode = "enforce"
+    PolicyModeBlock   PolicyMode = "block"
+)
+```
+
+<a name="PredicateRef"></a>
+## type PredicateRef
+
+PredicateRef describes a WHERE\-like predicate visible in the query builder metadata.
+
+```go
+type PredicateRef struct {
+    Group       int    `json:"group,omitempty"`
+    Connector   string `json:"connector,omitempty"`
+    Column      string `json:"column,omitempty"`
+    Operator    string `json:"operator,omitempty"`
+    ValueCount  int    `json:"value_count,omitempty"`
+    ValueColumn string `json:"value_column,omitempty"`
+    Raw         string `json:"raw,omitempty"`
+    Function    string `json:"function,omitempty"`
+    Subquery    bool   `json:"subquery,omitempty"`
+    Negated     bool   `json:"negated,omitempty"`
+}
+```
 
 <a name="Query"></a>
 ## type Query
@@ -976,6 +3194,15 @@ func New(exec executor, table string, dialect driver.Dialect) *Query
 ```
 
 New creates a Query with given db and table.
+
+<a name="Query.AccessReason"></a>
+### func \(\*Query\) AccessReason
+
+```go
+func (q *Query) AccessReason(reason string) *Query
+```
+
+AccessReason records why this query needs access to sensitive columns.
 
 <a name="Query.Avg"></a>
 ### func \(\*Query\) Avg
@@ -1265,6 +3492,15 @@ func (q *Query) Offset(n int) *Query
 
 Offset sets offset.
 
+<a name="Query.OnlyDeleted"></a>
+### func \(\*Query\) OnlyDeleted
+
+```go
+func (q *Query) OnlyDeleted() *Query
+```
+
+OnlyDeleted restricts a soft\-delete policy table to deleted rows.
+
 <a name="Query.OrHaving"></a>
 ### func \(\*Query\) OrHaving
 
@@ -1517,6 +3753,51 @@ func (q *Query) OrderByRaw(raw string) *Query
 
 OrderByRaw adds raw ORDER BY clause.
 
+<a name="Query.Plan"></a>
+### func \(\*Query\) Plan
+
+```go
+func (q *Query) Plan(ctx context.Context) (*QueryPlan, error)
+```
+
+Plan builds a QueryPlan for the current SELECT query without executing it.
+
+<a name="Query.PlanDelete"></a>
+### func \(\*Query\) PlanDelete
+
+```go
+func (q *Query) PlanDelete(ctx context.Context) (*QueryPlan, error)
+```
+
+PlanDelete builds a DELETE plan without executing it.
+
+<a name="Query.PlanInsert"></a>
+### func \(\*Query\) PlanInsert
+
+```go
+func (q *Query) PlanInsert(ctx context.Context, data any) (*QueryPlan, error)
+```
+
+PlanInsert builds an INSERT plan for data without executing it.
+
+<a name="Query.PlanInsertBatch"></a>
+### func \(\*Query\) PlanInsertBatch
+
+```go
+func (q *Query) PlanInsertBatch(ctx context.Context, data []map[string]any) (*QueryPlan, error)
+```
+
+PlanInsertBatch builds a batch INSERT plan without executing it.
+
+<a name="Query.PlanUpdate"></a>
+### func \(\*Query\) PlanUpdate
+
+```go
+func (q *Query) PlanUpdate(ctx context.Context, data any) (*QueryPlan, error)
+```
+
+PlanUpdate builds an UPDATE plan for data without executing it.
+
 <a name="Query.PrimaryKey"></a>
 ### func \(\*Query\) PrimaryKey
 
@@ -1543,6 +3824,15 @@ func (q *Query) ReOrder() *Query
 ```
 
 ReOrder clears ORDER BY clauses.
+
+<a name="Query.RequireApproval"></a>
+### func \(\*Query\) RequireApproval
+
+```go
+func (q *Query) RequireApproval(reason string) *Query
+```
+
+RequireApproval records an explicit reason for executing a risky query.
 
 <a name="Query.RightJoin"></a>
 ### func \(\*Query\) RightJoin
@@ -1633,6 +3923,15 @@ func (q *Query) Sum(col string) *Query
 ```
 
 Sum adds SUM aggregate function.
+
+<a name="Query.SuppressWarning"></a>
+### func \(\*Query\) SuppressWarning
+
+```go
+func (q *Query) SuppressWarning(code, reason string, opts ...SuppressionOption) *Query
+```
+
+SuppressWarning suppresses a suppressible warning for this query plan.
 
 <a name="Query.Take"></a>
 ### func \(\*Query\) Take
@@ -1930,6 +4229,475 @@ func (q *Query) WithContext(ctx context.Context) *Query
 ```
 
 WithContext sets ctx on the query for context\-aware execution.
+
+<a name="Query.WithDeleted"></a>
+### func \(\*Query\) WithDeleted
+
+```go
+func (q *Query) WithDeleted() *Query
+```
+
+WithDeleted disables the default soft\-delete filter for a policy table.
+
+<a name="QueryPlan"></a>
+## type QueryPlan
+
+QueryPlan explains SQL and metadata before the query is executed.
+
+```go
+type QueryPlan struct {
+    Operation          OperationType     `json:"operation"`
+    SQL                string            `json:"sql"`
+    Params             []any             `json:"params"`
+    Tables             []TableRef        `json:"tables,omitempty"`
+    Columns            []ColumnRef       `json:"columns,omitempty"`
+    Joins              []JoinRef         `json:"joins,omitempty"`
+    Predicates         []PredicateRef    `json:"predicates,omitempty"`
+    Limit              *int64            `json:"limit,omitempty"`
+    Offset             *int64            `json:"offset,omitempty"`
+    EstimatedRows      *int64            `json:"estimated_rows,omitempty"`
+    UsesIndex          *bool             `json:"uses_index,omitempty"`
+    RiskLevel          RiskLevel         `json:"risk_level"`
+    Warnings           []Warning         `json:"warnings,omitempty"`
+    SuppressedWarnings []Warning         `json:"suppressed_warnings,omitempty"`
+    RequiredApproval   bool              `json:"required_approval"`
+    Blocked            bool              `json:"blocked,omitempty"`
+    Approval           *Approval         `json:"approval,omitempty"`
+    AnalysisPrecision  AnalysisPrecision `json:"analysis_precision"`
+    Metadata           map[string]any    `json:"metadata,omitempty"`
+}
+```
+
+<a name="NewRawPlan"></a>
+### func NewRawPlan
+
+```go
+func NewRawPlan(sqlStr string, args ...any) *QueryPlan
+```
+
+NewRawPlan creates a plan for caller\-supplied SQL. It does not execute SQL.
+
+<a name="QueryPlan.RequiresApproval"></a>
+### func \(\*QueryPlan\) RequiresApproval
+
+```go
+func (p *QueryPlan) RequiresApproval() bool
+```
+
+RequiresApproval reports whether this plan needs explicit approval.
+
+<a name="QueryPlan.String"></a>
+### func \(\*QueryPlan\) String
+
+```go
+func (p *QueryPlan) String() string
+```
+
+String returns a compact pretty format suitable for logs and CLI output.
+
+<a name="QueryPlan.ToJSON"></a>
+### func \(\*QueryPlan\) ToJSON
+
+```go
+func (p *QueryPlan) ToJSON() ([]byte, error)
+```
+
+ToJSON returns stable, indented JSON for the plan.
+
+<a name="RiskConfig"></a>
+## type RiskConfig
+
+RiskConfig customizes risk rules for an environment or caller.
+
+```go
+type RiskConfig struct {
+    Environment string                    `json:"environment,omitempty"`
+    Rules       map[string]RiskRuleConfig `json:"rules,omitempty"`
+}
+```
+
+<a name="RiskEngine"></a>
+## type RiskEngine
+
+RiskEngine deterministically evaluates the structural DB risk of a query plan.
+
+```go
+type RiskEngine interface {
+    CheckQuery(plan *QueryPlan) RiskResult
+}
+```
+
+<a name="DefaultRiskEngine"></a>DefaultRiskEngine is the built\-in deterministic risk engine.
+
+```go
+var DefaultRiskEngine RiskEngine = defaultRiskEngine{}
+```
+
+<a name="NewRiskEngine"></a>
+### func NewRiskEngine
+
+```go
+func NewRiskEngine(config RiskConfig) RiskEngine
+```
+
+NewRiskEngine creates a deterministic risk engine using config overrides.
+
+<a name="RiskLevel"></a>
+## type RiskLevel
+
+RiskLevel is structural database risk, not a business\-safety guarantee.
+
+```go
+type RiskLevel string
+```
+
+<a name="RiskLow"></a>
+
+```go
+const (
+    RiskLow         RiskLevel = "low"
+    RiskMedium      RiskLevel = "medium"
+    RiskHigh        RiskLevel = "high"
+    RiskDestructive RiskLevel = "destructive"
+    RiskBlocked     RiskLevel = "blocked"
+)
+```
+
+<a name="RiskResult"></a>
+## type RiskResult
+
+RiskResult is the result of applying risk rules to a query plan.
+
+```go
+type RiskResult struct {
+    Level            RiskLevel `json:"level"`
+    Warnings         []Warning `json:"warnings,omitempty"`
+    RequiredApproval bool      `json:"required_approval"`
+    Blocked          bool      `json:"blocked"`
+}
+```
+
+<a name="RiskRuleConfig"></a>
+## type RiskRuleConfig
+
+RiskRuleConfig customizes a built\-in warning rule.
+
+```go
+type RiskRuleConfig struct {
+    Enabled        *bool      `json:"enabled,omitempty"`
+    Severity       *RiskLevel `json:"severity,omitempty"`
+    Suppressible   *bool      `json:"suppressible,omitempty"`
+    RequiresReason *bool      `json:"requires_reason,omitempty"`
+}
+```
+
+<a name="SourceLocation"></a>
+## type SourceLocation
+
+SourceLocation points at source code when a plan/finding is derived from static analysis.
+
+```go
+type SourceLocation struct {
+    File   string `json:"file,omitempty"`
+    Line   int    `json:"line,omitempty"`
+    Column int    `json:"column,omitempty"`
+}
+```
+
+<a name="Suppression"></a>
+## type Suppression
+
+Suppression suppresses an expected warning while keeping accountability data.
+
+```go
+type Suppression struct {
+    Code      string           `json:"code"`
+    Reason    string           `json:"reason"`
+    Scope     SuppressionScope `json:"scope"`
+    Location  *SourceLocation  `json:"location,omitempty"`
+    ExpiresAt *time.Time       `json:"expires_at,omitempty"`
+    Owner     string           `json:"owner,omitempty"`
+}
+```
+
+<a name="NewSuppression"></a>
+### func NewSuppression
+
+```go
+func NewSuppression(code, reason string, opts ...SuppressionOption) (Suppression, error)
+```
+
+NewSuppression creates a query\-scoped suppression.
+
+<a name="ParseInlineSuppression"></a>
+### func ParseInlineSuppression
+
+```go
+func ParseInlineSuppression(comment string) (Suppression, bool, error)
+```
+
+ParseInlineSuppression parses comments like: goquent:suppress LIMIT\_MISSING reason="batch export" expires="2026\-07\-01"
+
+<a name="SuppressionOption"></a>
+## type SuppressionOption
+
+SuppressionOption configures a runtime suppression.
+
+```go
+type SuppressionOption func(*Suppression)
+```
+
+<a name="SuppressionExpiresAt"></a>
+### func SuppressionExpiresAt
+
+```go
+func SuppressionExpiresAt(t time.Time) SuppressionOption
+```
+
+SuppressionExpiresAt sets the expiration timestamp for a suppression.
+
+<a name="SuppressionOwner"></a>
+### func SuppressionOwner
+
+```go
+func SuppressionOwner(owner string) SuppressionOption
+```
+
+SuppressionOwner sets the suppression owner.
+
+<a name="SuppressionScope"></a>
+## type SuppressionScope
+
+SuppressionScope describes where a suppression applies.
+
+```go
+type SuppressionScope string
+```
+
+<a name="SuppressionScopeQuery"></a>
+
+```go
+const (
+    SuppressionScopeQuery  SuppressionScope = "query"
+    SuppressionScopeInline SuppressionScope = "inline"
+    SuppressionScopeConfig SuppressionScope = "config"
+)
+```
+
+<a name="TablePolicy"></a>
+## type TablePolicy
+
+TablePolicy describes application\-specific safety policy for a table.
+
+```go
+type TablePolicy struct {
+    Table                 string     `json:"table"`
+    TenantColumn          string     `json:"tenant_column,omitempty"`
+    TenantMode            PolicyMode `json:"tenant_mode,omitempty"`
+    SoftDeleteColumn      string     `json:"soft_delete_column,omitempty"`
+    SoftDeleteMode        PolicyMode `json:"soft_delete_mode,omitempty"`
+    PIIColumns            []string   `json:"pii_columns,omitempty"`
+    PIIMode               PolicyMode `json:"pii_mode,omitempty"`
+    RequiredFilterColumns []string   `json:"required_filter_columns,omitempty"`
+    RequiredFilterMode    PolicyMode `json:"required_filter_mode,omitempty"`
+}
+```
+
+<a name="PolicyForTable"></a>
+### func PolicyForTable
+
+```go
+func PolicyForTable(table string) (TablePolicy, bool)
+```
+
+PolicyForTable returns a registered policy for table.
+
+<a name="RegisteredTablePolicies"></a>
+### func RegisteredTablePolicies
+
+```go
+func RegisteredTablePolicies() []TablePolicy
+```
+
+RegisteredTablePolicies returns all registered table policies in stable order.
+
+<a name="TableRef"></a>
+## type TableRef
+
+TableRef describes a table touched by the query.
+
+```go
+type TableRef struct {
+    Name  string `json:"name"`
+    Alias string `json:"alias,omitempty"`
+}
+```
+
+<a name="Warning"></a>
+## type Warning
+
+Warning is a reviewable issue attached to a plan.
+
+```go
+type Warning struct {
+    Code           string          `json:"code"`
+    Level          RiskLevel       `json:"level"`
+    Message        string          `json:"message"`
+    Location       *SourceLocation `json:"location,omitempty"`
+    Hint           string          `json:"hint,omitempty"`
+    Evidence       []Evidence      `json:"evidence,omitempty"`
+    Suppressible   bool            `json:"suppressible"`
+    RequiresReason bool            `json:"requires_reason"`
+}
+```
+
+# review
+
+```go
+import "github.com/faciam-dev/goquent/orm/review"
+```
+
+## Index
+
+- [func HasFindingsAtOrAbove\(report ReviewReport, threshold query.RiskLevel\) bool](<#HasFindingsAtOrAbove>)
+- [func ParseRiskLevel\(s string\) \(query.RiskLevel, error\)](<#ParseRiskLevel>)
+- [func WriteGitHub\(w io.Writer, report ReviewReport\) error](<#WriteGitHub>)
+- [func WriteJSON\(w io.Writer, report ReviewReport\) error](<#WriteJSON>)
+- [func WritePretty\(w io.Writer, report ReviewReport\) error](<#WritePretty>)
+- [type Finding](<#Finding>)
+- [type ManifestStatus](<#ManifestStatus>)
+- [type Options](<#Options>)
+- [type ReviewReport](<#ReviewReport>)
+  - [func Run\(opts Options\) \(ReviewReport, error\)](<#Run>)
+- [type ReviewSummary](<#ReviewSummary>)
+
+
+<a name="HasFindingsAtOrAbove"></a>
+## func HasFindingsAtOrAbove
+
+```go
+func HasFindingsAtOrAbove(report ReviewReport, threshold query.RiskLevel) bool
+```
+
+HasFindingsAtOrAbove reports whether report should fail CI at threshold.
+
+<a name="ParseRiskLevel"></a>
+## func ParseRiskLevel
+
+```go
+func ParseRiskLevel(s string) (query.RiskLevel, error)
+```
+
+ParseRiskLevel parses a CLI threshold.
+
+<a name="WriteGitHub"></a>
+## func WriteGitHub
+
+```go
+func WriteGitHub(w io.Writer, report ReviewReport) error
+```
+
+WriteGitHub writes GitHub Actions annotations for review findings.
+
+<a name="WriteJSON"></a>
+## func WriteJSON
+
+```go
+func WriteJSON(w io.Writer, report ReviewReport) error
+```
+
+WriteJSON writes a stable machine\-readable review report.
+
+<a name="WritePretty"></a>
+## func WritePretty
+
+```go
+func WritePretty(w io.Writer, report ReviewReport) error
+```
+
+WritePretty writes a human\-readable review report.
+
+<a name="Finding"></a>
+## type Finding
+
+Finding is a review finding emitted by goquent review.
+
+```go
+type Finding struct {
+    Code              string                  `json:"code"`
+    Level             query.RiskLevel         `json:"level"`
+    Message           string                  `json:"message"`
+    Location          *query.SourceLocation   `json:"location,omitempty"`
+    Hint              string                  `json:"hint,omitempty"`
+    Evidence          []query.Evidence        `json:"evidence,omitempty"`
+    AnalysisPrecision query.AnalysisPrecision `json:"analysis_precision"`
+    Suppressed        bool                    `json:"suppressed"`
+    Suppression       *query.Suppression      `json:"suppression,omitempty"`
+}
+```
+
+<a name="ManifestStatus"></a>
+## type ManifestStatus
+
+ManifestStatus is reserved for Phase 6 stale manifest integration.
+
+```go
+type ManifestStatus struct {
+    Fresh bool   `json:"fresh"`
+    Path  string `json:"path,omitempty"`
+}
+```
+
+<a name="Options"></a>
+## type Options
+
+Options controls review discovery and output behavior.
+
+```go
+type Options struct {
+    Paths                []string
+    ShowSuppressed       bool
+    ManifestPath         string
+    RequireFreshManifest bool
+}
+```
+
+<a name="ReviewReport"></a>
+## type ReviewReport
+
+ReviewReport is the top\-level report produced by goquent review.
+
+```go
+type ReviewReport struct {
+    Findings           []Finding       `json:"findings"`
+    SuppressedFindings []Finding       `json:"suppressed_findings,omitempty"`
+    Summary            ReviewSummary   `json:"summary"`
+    ManifestStatus     *ManifestStatus `json:"manifest_status,omitempty"`
+}
+```
+
+<a name="Run"></a>
+### func Run
+
+```go
+func Run(opts Options) (ReviewReport, error)
+```
+
+Run reviews all configured paths.
+
+<a name="ReviewSummary"></a>
+## type ReviewSummary
+
+ReviewSummary aggregates findings for machine\-readable output and CI.
+
+```go
+type ReviewSummary struct {
+    Total       int                     `json:"total"`
+    Suppressed  int                     `json:"suppressed"`
+    ByLevel     map[query.RiskLevel]int `json:"by_level,omitempty"`
+    HighestRisk query.RiskLevel         `json:"highest_risk"`
+}
+```
 
 # scanner
 
