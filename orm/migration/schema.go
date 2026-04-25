@@ -108,13 +108,22 @@ func diffTable(current, desired TableSchema) []MigrationStep {
 		}
 		if currentColumn.Nullable && !column.Nullable {
 			steps = append(steps, MigrationStep{
-				Type:              AddColumn,
-				Table:             desired.Name,
-				Column:            column.Name,
-				ColumnType:        column.Type,
-				Nullable:          boolPtr(false),
-				HasDefault:        column.HasDefault,
-				DefaultExpression: column.DefaultExpression,
+				Type:     AlterNullability,
+				Table:    desired.Name,
+				Column:   column.Name,
+				OldType:  currentColumn.Type,
+				NewType:  column.Type,
+				Nullable: boolPtr(false),
+			})
+		}
+		if !currentColumn.Nullable && column.Nullable {
+			steps = append(steps, MigrationStep{
+				Type:     AlterNullability,
+				Table:    desired.Name,
+				Column:   column.Name,
+				OldType:  currentColumn.Type,
+				NewType:  column.Type,
+				Nullable: boolPtr(true),
 			})
 		}
 	}

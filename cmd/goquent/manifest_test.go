@@ -90,6 +90,69 @@ func TestManifestVerifyDetectsStaleAndDoctor(t *testing.T) {
 	}
 }
 
+func TestManifestVerifyAgainstDBFlagControlsDatabaseFingerprint(t *testing.T) {
+	dir := t.TempDir()
+	schemaPath := filepath.Join(dir, "schema.json")
+	oldDBSchemaPath := filepath.Join(dir, "old-db-schema.json")
+	newDBSchemaPath := filepath.Join(dir, "new-db-schema.json")
+	writeJSON(t, schemaPath, migration.Schema{Tables: []migration.TableSchema{{
+		Name:    "users",
+		Columns: []migration.ColumnSchema{{Name: "id", Type: "bigint"}},
+	}}})
+	writeJSON(t, oldDBSchemaPath, migration.Schema{Tables: []migration.TableSchema{{
+		Name:    "users",
+		Columns: []migration.ColumnSchema{{Name: "id", Type: "bigint"}},
+	}}})
+	writeJSON(t, newDBSchemaPath, migration.Schema{Tables: []migration.TableSchema{{
+		Name:    "users",
+		Columns: []migration.ColumnSchema{{Name: "id", Type: "uuid"}},
+	}}})
+
+	stored, err := manifest.Generate(manifest.Options{
+		GeneratedAt:    time.Date(2026, 4, 25, 0, 0, 0, 0, time.UTC),
+		Schema:         loadTestSchema(t, schemaPath),
+		DatabaseSchema: loadTestSchema(t, oldDBSchemaPath),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(dir, "manifest.json")
+	writeJSON(t, manifestPath, stored)
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"manifest", "verify", "--manifest", manifestPath, "--schema", schemaPath, "--database-schema", newDBSchemaPath, "--format", "json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected database fingerprint to be ignored without --against-db, got %d stderr=%s stdout=%s", code, stderr.String(), stdout.String())
+	}
+	var verification manifest.Verification
+	if err := json.Unmarshal(stdout.Bytes(), &verification); err != nil {
+		t.Fatal(err)
+	}
+	if statusForCheck(verification, "database") != "skipped" {
+		t.Fatalf("expected skipped database check, got %s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"manifest", "verify", "--manifest", manifestPath, "--schema", schemaPath, "--database-schema", newDBSchemaPath, "--against-db", "--format", "json"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("expected stale database fingerprint with --against-db, got %d stderr=%s stdout=%s", code, stderr.String(), stdout.String())
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &verification); err != nil {
+		t.Fatal(err)
+	}
+	if statusForCheck(verification, "database") != "stale" {
+		t.Fatalf("expected stale database check, got %s", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"manifest", "verify", "--manifest", manifestPath, "--schema", schemaPath, "--against-db"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("expected --against-db without --database-schema to fail, got %d stderr=%s stdout=%s", code, stderr.String(), stdout.String())
+	}
+}
+
 func TestReviewCommandCanFailOnStaleManifest(t *testing.T) {
 	dir := t.TempDir()
 	stored, err := manifest.Generate(manifest.Options{
@@ -132,6 +195,15 @@ func writeJSON(t *testing.T, path string, v any) {
 	if err := os.WriteFile(path, b, 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func statusForCheck(v manifest.Verification, name string) string {
+	for _, check := range v.Checks {
+		if check.Name == name {
+			return check.Status
+		}
+	}
+	return ""
 }
 
 func loadTestSchema(t *testing.T, path string) *migration.Schema {

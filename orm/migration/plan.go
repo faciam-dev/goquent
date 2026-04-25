@@ -15,15 +15,16 @@ import (
 type MigrationStepType string
 
 const (
-	AddTable        MigrationStepType = "add_table"
-	DropTable       MigrationStepType = "drop_table"
-	AddColumn       MigrationStepType = "add_column"
-	DropColumn      MigrationStepType = "drop_column"
-	RenameColumn    MigrationStepType = "rename_column"
-	AlterColumnType MigrationStepType = "alter_column_type"
-	AddIndex        MigrationStepType = "add_index"
-	DropIndex       MigrationStepType = "drop_index"
-	UnsupportedStep MigrationStepType = "unsupported"
+	AddTable         MigrationStepType = "add_table"
+	DropTable        MigrationStepType = "drop_table"
+	AddColumn        MigrationStepType = "add_column"
+	DropColumn       MigrationStepType = "drop_column"
+	RenameColumn     MigrationStepType = "rename_column"
+	AlterColumnType  MigrationStepType = "alter_column_type"
+	AlterNullability MigrationStepType = "alter_nullability"
+	AddIndex         MigrationStepType = "add_index"
+	DropIndex        MigrationStepType = "drop_index"
+	UnsupportedStep  MigrationStepType = "unsupported"
 )
 
 const (
@@ -34,6 +35,7 @@ const (
 	WarningMigrationRenameColumn          = "MIGRATION_RENAME_COLUMN"
 	WarningMigrationAlterColumnType       = "MIGRATION_ALTER_COLUMN_TYPE"
 	WarningMigrationTypeNarrowing         = "MIGRATION_TYPE_NARROWING"
+	WarningMigrationSetNotNull            = "MIGRATION_SET_NOT_NULL"
 	WarningMigrationAddIndexNonConcurrent = "MIGRATION_ADD_INDEX_NON_CONCURRENT"
 	WarningMigrationDropIndex             = "MIGRATION_DROP_INDEX"
 )

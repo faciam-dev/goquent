@@ -20,6 +20,8 @@ var (
 	dropColumnRE  = regexp.MustCompile(`(?is)^\s*ALTER\s+TABLE\s+([` + "`" + `"\w.]+)\s+DROP\s+(?:COLUMN\s+)?(?:IF\s+EXISTS\s+)?([` + "`" + `"\w.]+)`)
 	renameColRE   = regexp.MustCompile(`(?is)^\s*ALTER\s+TABLE\s+([` + "`" + `"\w.]+)\s+RENAME\s+COLUMN\s+([` + "`" + `"\w.]+)\s+TO\s+([` + "`" + `"\w.]+)`)
 	alterTypeRE   = regexp.MustCompile(`(?is)^\s*ALTER\s+TABLE\s+([` + "`" + `"\w.]+)\s+ALTER\s+(?:COLUMN\s+)?([` + "`" + `"\w.]+)\s+TYPE\s+(.+)$`)
+	setNotNullRE  = regexp.MustCompile(`(?is)^\s*ALTER\s+TABLE\s+([` + "`" + `"\w.]+)\s+ALTER\s+(?:COLUMN\s+)?([` + "`" + `"\w.]+)\s+SET\s+NOT\s+NULL`)
+	dropNotNullRE = regexp.MustCompile(`(?is)^\s*ALTER\s+TABLE\s+([` + "`" + `"\w.]+)\s+ALTER\s+(?:COLUMN\s+)?([` + "`" + `"\w.]+)\s+DROP\s+NOT\s+NULL`)
 	modifyColRE   = regexp.MustCompile(`(?is)^\s*ALTER\s+TABLE\s+([` + "`" + `"\w.]+)\s+MODIFY\s+(?:COLUMN\s+)?([` + "`" + `"\w.]+)\s+(.+)$`)
 	changeColRE   = regexp.MustCompile(`(?is)^\s*ALTER\s+TABLE\s+([` + "`" + `"\w.]+)\s+CHANGE\s+(?:COLUMN\s+)?([` + "`" + `"\w.]+)\s+([` + "`" + `"\w.]+)\s+(.+)$`)
 	createIndexRE = regexp.MustCompile(`(?is)^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+(CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?([` + "`" + `"\w.]+)\s+ON\s+([` + "`" + `"\w.]+)`)
@@ -183,6 +185,22 @@ func parseMigrationStatement(statement sqlStatement) MigrationStep {
 		step.AnalysisPrecision = query.AnalysisPartial
 		return step
 	}
+	if m := setNotNullRE.FindStringSubmatch(sql); len(m) > 0 {
+		nullable := false
+		step.Type = AlterNullability
+		step.Table = cleanIdentifier(m[1])
+		step.Column = cleanIdentifier(m[2])
+		step.Nullable = &nullable
+		return step
+	}
+	if m := dropNotNullRE.FindStringSubmatch(sql); len(m) > 0 {
+		nullable := true
+		step.Type = AlterNullability
+		step.Table = cleanIdentifier(m[1])
+		step.Column = cleanIdentifier(m[2])
+		step.Nullable = &nullable
+		return step
+	}
 	if m := modifyColRE.FindStringSubmatch(sql); len(m) > 0 {
 		step.Type = AlterColumnType
 		step.Table = cleanIdentifier(m[1])
@@ -301,6 +319,25 @@ func classifyStep(step *MigrationStep) {
 		if compareRisk(level, query.RiskHigh) >= 0 {
 			step.Preflight = alterTypePreflight(step.Table, step.Column)
 		}
+	case AlterNullability:
+		nullable := true
+		if step.Nullable != nil {
+			nullable = *step.Nullable
+		}
+		if nullable {
+			step.RiskLevel = query.RiskLow
+			return
+		}
+		step.RiskLevel = query.RiskHigh
+		step.Warnings = append(step.Warnings, newWarning(
+			WarningMigrationSetNotNull,
+			query.RiskHigh,
+			"migration enforces NOT NULL on an existing column",
+			"backfill existing NULL values before enforcing NOT NULL",
+			true,
+			step.Line,
+		))
+		step.Preflight = setNotNullPreflight(step.Table, step.Column)
 	case AddIndex:
 		if step.Concurrent {
 			step.RiskLevel = query.RiskLow
@@ -546,5 +583,14 @@ func alterTypePreflight(table, column string) []string {
 		"test conversion on production-like data",
 		"backup affected data before migration",
 		"verify lock duration and rollback behavior on the target database",
+	}
+}
+
+func setNotNullPreflight(table, column string) []string {
+	return []string{
+		"check for existing NULL values in " + table + "." + column,
+		"backfill existing rows before enforcing NOT NULL",
+		"verify writes already provide " + table + "." + column,
+		"verify lock behavior on the target database",
 	}
 }

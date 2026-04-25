@@ -119,7 +119,6 @@ func runManifestVerify(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	_ = *againstDB
 	outputFormat, ok := normalizeManifestFormat(*format)
 	if !ok {
 		fmt.Fprintf(stderr, "unknown manifest format %q\n", *format)
@@ -129,17 +128,29 @@ func runManifestVerify(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "goquent manifest verify requires --manifest")
 		return 2
 	}
+	databaseSchemaForVerify := ""
+	if *againstDB {
+		if strings.TrimSpace(*databaseSchemaPath) == "" {
+			fmt.Fprintln(stderr, "goquent manifest verify --against-db requires --database-schema")
+			return 2
+		}
+		databaseSchemaForVerify = *databaseSchemaPath
+	}
 	stored, err := manifest.Load(*manifestPath)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	current, err := buildManifestFromFlags(*dialect, *schemaPath, *policyPath, *databaseSchemaPath, *generatorVersion, codePaths)
+	current, err := buildManifestFromFlags(*dialect, *schemaPath, *policyPath, databaseSchemaForVerify, *generatorVersion, codePaths)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	verification := manifest.Verify(stored, current, time.Time{})
+	storedForVerify := *stored
+	if !*againstDB {
+		storedForVerify.DatabaseFingerprint = ""
+	}
+	verification := manifest.Verify(&storedForVerify, current, time.Time{})
 	if outputFormat == "json" {
 		err = manifest.WriteVerificationJSON(stdout, verification)
 	} else {

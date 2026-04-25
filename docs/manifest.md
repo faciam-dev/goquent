@@ -53,6 +53,15 @@ go run ./cmd/goquent manifest verify \
   --policy policies.json
 ```
 
+Database fingerprint comparison is opt-in during verify:
+
+```bash
+go run ./cmd/goquent manifest verify \
+  --manifest goquent.manifest.json \
+  --database-schema database-schema.json \
+  --against-db
+```
+
 `manifest verify` returns `0` when the stored manifest matches current inputs and `1` when it is
 stale. A stale manifest must not be used to justify schema, policy, tenant, PII, relation, or
 migration decisions.

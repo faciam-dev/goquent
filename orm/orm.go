@@ -242,6 +242,17 @@ func (db *DB) execContextTrusted(ctx context.Context, q string, args ...any) (sq
 	return db.exec.Exec(q, args...)
 }
 
+const rawQueryRowRejectedSQL = "SELECT 1 WHERE 1 = 0"
+
+func (db *DB) rejectedQueryRow(ctx context.Context) *sql.Row {
+	if ctx == nil || ctx.Err() == nil {
+		canceled, cancel := context.WithCancel(context.Background())
+		cancel()
+		ctx = canceled
+	}
+	return db.exec.QueryRowContext(ctx, rawQueryRowRejectedSQL)
+}
+
 // Query runs a raw SQL query returning multiple rows.
 func (db *DB) Query(q string, args ...any) (*sql.Rows, error) {
 	if _, err := db.ensureRawExecutable(nil, q, args...); err != nil {
@@ -283,9 +294,12 @@ func (db *DB) ExecContext(ctx context.Context, q string, args ...any) (sql.Resul
 //
 // Deprecated: use QueryRowE so raw SQL safety errors can be returned before
 // Scan. QueryRow cannot surface pre-execution approval errors because *sql.Row
-// has no public error constructor.
+// has no public error constructor. When raw SQL approval checks fail, QueryRow
+// does not execute the caller-supplied SQL.
 func (db *DB) QueryRow(q string, args ...any) *sql.Row {
-	_ = query.NewRawPlan(q, args...)
+	if _, err := db.ensureRawExecutable(nil, q, args...); err != nil {
+		return db.rejectedQueryRow(nil)
+	}
 	return db.exec.QueryRow(q, args...)
 }
 
@@ -293,9 +307,12 @@ func (db *DB) QueryRow(q string, args ...any) *sql.Row {
 //
 // Deprecated: use QueryRowE so raw SQL safety errors can be returned before
 // Scan. QueryRowContext cannot surface pre-execution approval errors because
-// *sql.Row has no public error constructor.
+// *sql.Row has no public error constructor. When raw SQL approval checks fail,
+// QueryRowContext does not execute the caller-supplied SQL.
 func (db *DB) QueryRowContext(ctx context.Context, q string, args ...any) *sql.Row {
-	_ = query.NewRawPlan(q, args...)
+	if _, err := db.ensureRawExecutable(ctx, q, args...); err != nil {
+		return db.rejectedQueryRow(ctx)
+	}
 	return db.exec.QueryRowContext(ctx, q, args...)
 }
 

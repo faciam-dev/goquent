@@ -17,15 +17,16 @@ type ColumnSchema = migration.ColumnSchema
 type IndexSchema = migration.IndexSchema
 
 const (
-	AddTable        = migration.AddTable
-	DropTable       = migration.DropTable
-	AddColumn       = migration.AddColumn
-	DropColumn      = migration.DropColumn
-	RenameColumn    = migration.RenameColumn
-	AlterColumnType = migration.AlterColumnType
-	AddIndex        = migration.AddIndex
-	DropIndex       = migration.DropIndex
-	UnsupportedStep = migration.UnsupportedStep
+	AddTable         = migration.AddTable
+	DropTable        = migration.DropTable
+	AddColumn        = migration.AddColumn
+	DropColumn       = migration.DropColumn
+	RenameColumn     = migration.RenameColumn
+	AlterColumnType  = migration.AlterColumnType
+	AlterNullability = migration.AlterNullability
+	AddIndex         = migration.AddIndex
+	DropIndex        = migration.DropIndex
+	UnsupportedStep  = migration.UnsupportedStep
 
 	WarningMigrationUnsupported           = migration.WarningMigrationUnsupported
 	WarningMigrationDropTable             = migration.WarningMigrationDropTable
@@ -34,6 +35,7 @@ const (
 	WarningMigrationRenameColumn          = migration.WarningMigrationRenameColumn
 	WarningMigrationAlterColumnType       = migration.WarningMigrationAlterColumnType
 	WarningMigrationTypeNarrowing         = migration.WarningMigrationTypeNarrowing
+	WarningMigrationSetNotNull            = migration.WarningMigrationSetNotNull
 	WarningMigrationAddIndexNonConcurrent = migration.WarningMigrationAddIndexNonConcurrent
 	WarningMigrationDropIndex             = migration.WarningMigrationDropIndex
 )

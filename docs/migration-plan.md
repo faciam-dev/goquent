@@ -18,6 +18,7 @@ Supported step types include:
 - `drop_column`
 - `rename_column`
 - `alter_column_type`
+- `alter_nullability`
 - `add_index`
 - `drop_index`
 - `unsupported`
@@ -27,6 +28,7 @@ Risk examples:
 - Dropping a table or column is destructive.
 - Adding a not-null column without a default is risky.
 - Renaming or altering a column type is high risk.
+- Enforcing `NOT NULL` on an existing nullable column is high risk.
 - Adding a PostgreSQL index without `CONCURRENTLY` is medium risk.
 - Unsupported SQL is reported as partial or unsupported.
 

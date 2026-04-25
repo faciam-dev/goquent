@@ -134,6 +134,32 @@ func TestClassifyTypeChange(t *testing.T) {
 	}
 }
 
+func TestPlanSQLClassifiesSetNotNull(t *testing.T) {
+	plan, err := PlanSQL(`ALTER TABLE users ALTER COLUMN email SET NOT NULL;`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Steps) != 1 {
+		t.Fatalf("expected one step, got %#v", plan.Steps)
+	}
+	step := plan.Steps[0]
+	if step.Type != AlterNullability {
+		t.Fatalf("expected alter nullability step, got %#v", step)
+	}
+	if step.Nullable == nil || *step.Nullable {
+		t.Fatalf("expected nullable=false, got %#v", step.Nullable)
+	}
+	if step.RiskLevel != query.RiskHigh || !plan.RequiredApproval {
+		t.Fatalf("expected high-risk approval gate, risk=%s required=%v", step.RiskLevel, plan.RequiredApproval)
+	}
+	if len(step.Warnings) == 0 || step.Warnings[0].Code != WarningMigrationSetNotNull {
+		t.Fatalf("expected set-not-null warning, got %#v", step.Warnings)
+	}
+	if len(step.Preflight) == 0 {
+		t.Fatalf("expected set-not-null preflight suggestions")
+	}
+}
+
 func TestPlanSQLStatementSplittingAndJSON(t *testing.T) {
 	plan, err := PlanSQL(`
 -- comments should not become statements
@@ -202,6 +228,35 @@ func TestDiffSchemasBuildsMigrationPlan(t *testing.T) {
 	}
 	if plan.RiskLevel != query.RiskDestructive {
 		t.Fatalf("expected destructive diff due to drop/type narrowing, got %s", plan.RiskLevel)
+	}
+}
+
+func TestDiffSchemasBuildsNullabilityStep(t *testing.T) {
+	current := Schema{Tables: []TableSchema{{
+		Name:    "users",
+		Columns: []ColumnSchema{{Name: "email", Type: "text", Nullable: true}},
+	}}}
+	desired := Schema{Tables: []TableSchema{{
+		Name:    "users",
+		Columns: []ColumnSchema{{Name: "email", Type: "text", Nullable: false}},
+	}}}
+
+	plan := DiffSchemas(current, desired)
+	if len(plan.Steps) != 1 {
+		t.Fatalf("expected one step, got %#v", plan.Steps)
+	}
+	step := plan.Steps[0]
+	if step.Type != AlterNullability {
+		t.Fatalf("expected alter nullability, got %#v", step)
+	}
+	if step.Column != "email" || step.Nullable == nil || *step.Nullable {
+		t.Fatalf("unexpected nullability step: %#v", step)
+	}
+	if hasStep(plan.Steps, AddColumn, "email") {
+		t.Fatalf("nullable->not-null should not be represented as add column: %#v", plan.Steps)
+	}
+	if step.RiskLevel != query.RiskHigh {
+		t.Fatalf("expected high-risk set-not-null diff, got %s", step.RiskLevel)
 	}
 }
 
