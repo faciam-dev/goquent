@@ -1,0 +1,12 @@
+{
+  "operation": "select",
+  "model": "users",
+  "select": ["id", "name"],
+  "filters": [
+    {"field": "tenant_id", "op": "=", "value_ref": "current_tenant"}
+  ],
+  "order_by": [
+    {"field": "id", "direction": "asc"}
+  ],
+  "limit": 25
+}

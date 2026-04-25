@@ -1,0 +1,13 @@
+[
+  {
+    "table": "users",
+    "tenant_column": "tenant_id",
+    "tenant_mode": "enforce",
+    "soft_delete_column": "deleted_at",
+    "soft_delete_mode": "enforce",
+    "pii_columns": ["email"],
+    "pii_mode": "warn",
+    "required_filter_columns": ["tenant_id"],
+    "required_filter_mode": "enforce"
+  }
+]

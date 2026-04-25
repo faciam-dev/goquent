@@ -185,30 +185,42 @@ func (db *DB) Table(name string) *query.Query {
 
 // Query runs a raw SQL query returning multiple rows.
 func (db *DB) Query(q string, args ...any) (*sql.Rows, error) {
+	_ = query.NewRawPlan(q, args...)
 	return db.exec.Query(q, args...)
 }
 
 // QueryContext runs Query with a context.
 func (db *DB) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
+	_ = query.NewRawPlan(q, args...)
 	return db.exec.QueryContext(ctx, q, args...)
 }
 
+// RawPlan creates a plan for caller-supplied SQL without executing it.
+func (db *DB) RawPlan(ctx context.Context, q string, args ...any) (*QueryPlan, error) {
+	_ = ctx
+	return query.NewRawPlan(q, args...), nil
+}
+
 // Exec executes a raw SQL statement.
-func (db *DB) Exec(query string, args ...any) (sql.Result, error) {
-	return db.exec.Exec(query, args...)
+func (db *DB) Exec(q string, args ...any) (sql.Result, error) {
+	_ = query.NewRawPlan(q, args...)
+	return db.exec.Exec(q, args...)
 }
 
 // ExecContext executes a raw SQL statement with a context.
-func (db *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return db.exec.ExecContext(ctx, query, args...)
+func (db *DB) ExecContext(ctx context.Context, q string, args ...any) (sql.Result, error) {
+	_ = query.NewRawPlan(q, args...)
+	return db.exec.ExecContext(ctx, q, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
-func (db *DB) QueryRow(query string, args ...any) *sql.Row {
-	return db.exec.QueryRow(query, args...)
+func (db *DB) QueryRow(q string, args ...any) *sql.Row {
+	_ = query.NewRawPlan(q, args...)
+	return db.exec.QueryRow(q, args...)
 }
 
 // QueryRowContext executes a query with context returning at most one row.
-func (db *DB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
-	return db.exec.QueryRowContext(ctx, query, args...)
+func (db *DB) QueryRowContext(ctx context.Context, q string, args ...any) *sql.Row {
+	_ = query.NewRawPlan(q, args...)
+	return db.exec.QueryRowContext(ctx, q, args...)
 }

@@ -1,0 +1,57 @@
+package operation
+
+import "encoding/json"
+
+// JSONSchema returns the OperationSpec MVP JSON Schema.
+func JSONSchema() ([]byte, error) {
+	schema := map[string]any{
+		"$schema":              "https://json-schema.org/draft/2020-12/schema",
+		"$id":                  "https://faciam.dev/goquent/operation-spec.schema.json",
+		"title":                "Goquent OperationSpec",
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"operation", "model", "select"},
+		"properties": map[string]any{
+			"operation":     map[string]any{"const": OperationSelect},
+			"model":         map[string]any{"type": "string", "minLength": 1},
+			"select":        map[string]any{"type": "array", "minItems": 1, "items": map[string]any{"type": "string"}},
+			"filters":       filterArraySchema(),
+			"order_by":      orderArraySchema(),
+			"limit":         map[string]any{"type": "integer", "minimum": 0},
+			"access_reason": map[string]any{"type": "string"},
+		},
+	}
+	return json.MarshalIndent(schema, "", "  ")
+}
+
+func filterArraySchema() map[string]any {
+	return map[string]any{
+		"type": "array",
+		"items": map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"required":             []string{"field", "op"},
+			"properties": map[string]any{
+				"field":     map[string]any{"type": "string", "minLength": 1},
+				"op":        map[string]any{"enum": []string{"=", "!=", "<>", ">", ">=", "<", "<=", "like", "in", "is_null", "is_not_null", "eq", "ne", "gt", "gte", "lt", "lte"}},
+				"value":     map[string]any{},
+				"value_ref": map[string]any{"type": "string"},
+			},
+		},
+	}
+}
+
+func orderArraySchema() map[string]any {
+	return map[string]any{
+		"type": "array",
+		"items": map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"required":             []string{"field"},
+			"properties": map[string]any{
+				"field":     map[string]any{"type": "string", "minLength": 1},
+				"direction": map[string]any{"enum": []string{"", "asc", "desc"}},
+			},
+		},
+	}
+}

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"strings"
+	"time"
 	"unsafe"
 
 	qbapi "github.com/faciam-dev/goquent-query-builder/api"
@@ -34,19 +36,30 @@ type executor interface {
 
 // Query wraps goquent QueryBuilder and the executor.
 type Query struct {
-	builder    *qbapi.SelectQueryBuilder
-	exec       executor
-	ctx        context.Context
-	err        error
-	dialect    driver.Dialect
-	primaryKey string
+	builder       *qbapi.SelectQueryBuilder
+	exec          executor
+	ctx           context.Context
+	err           error
+	dialect       driver.Dialect
+	primaryKey    string
+	approval      *Approval
+	suppressions  []Suppression
+	policy        *TablePolicy
+	accessReason  string
+	withDeleted   bool
+	onlyDeleted   bool
+	policyApplied bool
 }
 
 // New creates a Query with given db and table.
 func New(exec executor, table string, dialect driver.Dialect) *Query {
 	builder := newSelectBuilder(dialect)
 	builder.Table(table)
-	return &Query{builder: builder, exec: exec, dialect: dialect, primaryKey: "id"}
+	q := &Query{builder: builder, exec: exec, dialect: dialect, primaryKey: "id"}
+	if policy, ok := PolicyForTable(table); ok {
+		q.policy = &policy
+	}
+	return q
 }
 
 func builderByDialect[T any](d driver.Dialect, mysqlFn, pgFn func() T) T {
@@ -111,6 +124,97 @@ func (q *Query) WithContext(ctx context.Context) *Query {
 	return q
 }
 
+// RequireApproval records an explicit reason for executing a risky query.
+func (q *Query) RequireApproval(reason string) *Query {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		q.err = ErrApprovalReasonRequired
+		return q
+	}
+	q.approval = &Approval{Reason: reason, CreatedAt: time.Now().UTC()}
+	return q
+}
+
+// SuppressWarning suppresses a suppressible warning for this query plan.
+func (q *Query) SuppressWarning(code, reason string, opts ...SuppressionOption) *Query {
+	s, err := NewSuppression(code, reason, opts...)
+	if err != nil {
+		q.err = err
+		return q
+	}
+	q.suppressions = append(q.suppressions, s)
+	return q
+}
+
+// AccessReason records why this query needs access to sensitive columns.
+func (q *Query) AccessReason(reason string) *Query {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		q.err = ErrAccessReasonRequired
+		return q
+	}
+	q.accessReason = reason
+	return q
+}
+
+// WithDeleted disables the default soft-delete filter for a policy table.
+func (q *Query) WithDeleted() *Query {
+	q.withDeleted = true
+	q.onlyDeleted = false
+	return q
+}
+
+// OnlyDeleted restricts a soft-delete policy table to deleted rows.
+func (q *Query) OnlyDeleted() *Query {
+	q.onlyDeleted = true
+	q.withDeleted = false
+	return q
+}
+
+func (q *Query) finalizePlan(plan *QueryPlan) {
+	if plan == nil {
+		return
+	}
+	q.applyPolicyMetadata(plan)
+	finalizePlanWithPolicy(plan, q.approval, q.suppressions, q.policy)
+}
+
+func (q *Query) applyPolicyPredicates() {
+	if q.policyApplied || q.policy == nil || q.policy.SoftDeleteColumn == "" {
+		return
+	}
+	switch {
+	case q.onlyDeleted:
+		q.builder.WhereNotNull(q.policy.SoftDeleteColumn)
+		q.policyApplied = true
+	case q.withDeleted:
+		q.policyApplied = true
+	default:
+		q.builder.WhereNull(q.policy.SoftDeleteColumn)
+		q.policyApplied = true
+	}
+}
+
+func (q *Query) applyPolicyMetadata(plan *QueryPlan) {
+	if plan.Metadata == nil {
+		plan.Metadata = make(map[string]any)
+	}
+	if q.accessReason != "" {
+		plan.Metadata["access_reason"] = q.accessReason
+	}
+	if q.policy == nil {
+		return
+	}
+	plan.Metadata["policy_table"] = q.policy.Table
+	if q.withDeleted {
+		plan.Metadata["soft_delete"] = "with_deleted"
+	} else if q.onlyDeleted {
+		plan.Metadata["soft_delete"] = "only_deleted"
+	} else if q.policy.SoftDeleteColumn != "" {
+		plan.Metadata["soft_delete"] = "default"
+	}
+}
+
 // queryRows executes Query or QueryContext based on whether ctx is set.
 func (q *Query) queryRows(sqlStr string, args ...any) (*sql.Rows, error) {
 	if q.ctx != nil {
@@ -165,14 +269,14 @@ func (q *Query) Where(col string, args ...any) *Query {
 
 // First scans the first result into dest struct.
 func (q *Query) First(dest any) error {
-	if q.err != nil {
-		return q.err
-	}
-	sqlStr, args, err := q.builder.Build()
+	plan, err := q.Plan(q.ctx)
 	if err != nil {
 		return err
 	}
-	rows, err := q.queryRows(sqlStr, args...)
+	if err := ensurePlanExecutable(plan); err != nil {
+		return err
+	}
+	rows, err := q.queryRows(plan.SQL, plan.Params...)
 	if err != nil {
 		return err
 	}
@@ -182,14 +286,14 @@ func (q *Query) First(dest any) error {
 
 // FirstMap scans first row into map.
 func (q *Query) FirstMap(dest *map[string]any) error {
-	if q.err != nil {
-		return q.err
-	}
-	sqlStr, args, err := q.builder.Build()
+	plan, err := q.Plan(q.ctx)
 	if err != nil {
 		return err
 	}
-	rows, err := q.queryRows(sqlStr, args...)
+	if err := ensurePlanExecutable(plan); err != nil {
+		return err
+	}
+	rows, err := q.queryRows(plan.SQL, plan.Params...)
 	if err != nil {
 		return err
 	}
@@ -204,14 +308,14 @@ func (q *Query) FirstMap(dest *map[string]any) error {
 
 // GetMaps scans all rows into slice of maps.
 func (q *Query) GetMaps(dest *[]map[string]any) error {
-	if q.err != nil {
-		return q.err
-	}
-	sqlStr, args, err := q.builder.Build()
+	plan, err := q.Plan(q.ctx)
 	if err != nil {
 		return err
 	}
-	rows, err := q.queryRows(sqlStr, args...)
+	if err := ensurePlanExecutable(plan); err != nil {
+		return err
+	}
+	rows, err := q.queryRows(plan.SQL, plan.Params...)
 	if err != nil {
 		return err
 	}
@@ -226,14 +330,14 @@ func (q *Query) GetMaps(dest *[]map[string]any) error {
 
 // Get scans all rows into the slice pointed to by dest.
 func (q *Query) Get(dest any) error {
-	if q.err != nil {
-		return q.err
-	}
-	sqlStr, args, err := q.builder.Build()
+	plan, err := q.Plan(q.ctx)
 	if err != nil {
 		return err
 	}
-	rows, err := q.queryRows(sqlStr, args...)
+	if err := ensurePlanExecutable(plan); err != nil {
+		return err
+	}
+	rows, err := q.queryRows(plan.SQL, plan.Params...)
 	if err != nil {
 		return err
 	}
@@ -265,6 +369,7 @@ func (q *Query) Count(cols ...string) (int64, error) {
 	if q.err != nil {
 		return 0, q.err
 	}
+	q.applyPolicyPredicates()
 
 	b := newSelectBuilder(q.dialect)
 	b.Table(q.builder.GetQuery().Table.Name)
@@ -273,16 +378,19 @@ func (q *Query) Count(cols ...string) (int64, error) {
 	}
 	b.Count(cols...)
 
-	sqlStr, args, err := b.Build()
+	plan, err := q.planSelectBuilder(q.ctx, b)
 	if err != nil {
+		return 0, err
+	}
+	if err := ensurePlanExecutable(plan); err != nil {
 		return 0, err
 	}
 
 	var row *sql.Row
 	if q.ctx != nil {
-		row = q.exec.QueryRowContext(q.ctx, sqlStr, args...)
+		row = q.exec.QueryRowContext(q.ctx, plan.SQL, plan.Params...)
 	} else {
-		row = q.exec.QueryRow(sqlStr, args...)
+		row = q.exec.QueryRow(plan.SQL, plan.Params...)
 	}
 	var c int64
 	if err := row.Scan(&c); err != nil {
@@ -854,6 +962,22 @@ func dataToMap(data any) (map[string]any, error) {
 
 // Insert executes an INSERT with the given data.
 func (q *Query) Insert(data any) (sql.Result, error) {
+	plan, err := q.PlanInsert(q.ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensurePlanExecutable(plan); err != nil {
+		return nil, err
+	}
+	return q.execStmt(plan.SQL, plan.Params...)
+}
+
+// PlanInsert builds an INSERT plan for data without executing it.
+func (q *Query) PlanInsert(ctx context.Context, data any) (*QueryPlan, error) {
+	_ = ctx
+	if q.err != nil {
+		return nil, q.err
+	}
 	m, err := dataToMap(data)
 	if err != nil {
 		return nil, err
@@ -864,7 +988,11 @@ func (q *Query) Insert(data any) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return q.execStmt(sqlStr, args...)
+	plan := newQueryPlan(OperationInsert, sqlStr, args)
+	plan.Tables = append(plan.Tables, TableRef{Name: q.builder.GetQuery().Table.Name})
+	plan.Columns = columnRefsFromNames(sortedMapKeys(m))
+	q.finalizePlan(plan)
+	return plan, nil
 }
 
 // InsertGetId executes an INSERT and returns the auto-increment ID.
@@ -876,15 +1004,13 @@ func (q *Query) InsertGetId(data any) (int64, error) {
 		return 0, err
 	}
 	if _, ok := q.dialect.(driver.PostgresDialect); ok {
-		ib := newInsertBuilder(q.dialect)
-		ib.Table(q.builder.GetQuery().Table.Name).Insert(m)
-		sqlStr, args, err := ib.Build()
+		plan, err := q.PlanInsert(q.ctx, m)
 		if err != nil {
 			return 0, err
 		}
-		sqlStr += " RETURNING " + q.dialect.QuoteIdent(q.getPrimaryKeyColumn())
+		plan.SQL += " RETURNING " + q.dialect.QuoteIdent(q.getPrimaryKeyColumn())
 		var id int64
-		if err := q.queryRow(sqlStr, args...).Scan(&id); err != nil {
+		if err := q.queryRow(plan.SQL, plan.Params...).Scan(&id); err != nil {
 			return 0, err
 		}
 		return id, nil
@@ -903,61 +1029,186 @@ func (q *Query) InsertGetId(data any) (int64, error) {
 
 // InsertBatch executes a bulk INSERT with the given slice of data maps.
 func (q *Query) InsertBatch(data []map[string]any) (sql.Result, error) {
+	plan, err := q.PlanInsertBatch(q.ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensurePlanExecutable(plan); err != nil {
+		return nil, err
+	}
+	return q.execStmt(plan.SQL, plan.Params...)
+}
+
+// PlanInsertBatch builds a batch INSERT plan without executing it.
+func (q *Query) PlanInsertBatch(ctx context.Context, data []map[string]any) (*QueryPlan, error) {
+	_ = ctx
+	if q.err != nil {
+		return nil, q.err
+	}
 	ib := newInsertBuilder(q.dialect)
 	ib.Table(q.builder.GetQuery().Table.Name).InsertBatch(data)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
 		return nil, err
 	}
-	return q.execStmt(sqlStr, args...)
+	plan := newQueryPlan(OperationInsert, sqlStr, args)
+	plan.Tables = append(plan.Tables, TableRef{Name: q.builder.GetQuery().Table.Name})
+	plan.Columns = columnRefsFromNames(sortedBatchMapKeys(data))
+	plan.Metadata = map[string]any{"batch_size": len(data)}
+	q.finalizePlan(plan)
+	return plan, nil
 }
 
 // InsertOrIgnore executes an INSERT IGNORE.
 func (q *Query) InsertOrIgnore(data []map[string]any) (sql.Result, error) {
+	plan, err := q.planInsertOrIgnore(q.ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensurePlanExecutable(plan); err != nil {
+		return nil, err
+	}
+	return q.execStmt(plan.SQL, plan.Params...)
+}
+
+func (q *Query) planInsertOrIgnore(ctx context.Context, data []map[string]any) (*QueryPlan, error) {
+	_ = ctx
+	if q.err != nil {
+		return nil, q.err
+	}
 	ib := newInsertBuilder(q.dialect)
 	ib.Table(q.builder.GetQuery().Table.Name).InsertOrIgnore(data)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
 		return nil, err
 	}
-	return q.execStmt(sqlStr, args...)
+	plan := newQueryPlan(OperationInsert, sqlStr, args)
+	plan.Tables = append(plan.Tables, TableRef{Name: q.builder.GetQuery().Table.Name})
+	plan.Columns = columnRefsFromNames(sortedBatchMapKeys(data))
+	plan.Metadata = map[string]any{"insert_mode": "ignore", "batch_size": len(data)}
+	q.finalizePlan(plan)
+	return plan, nil
 }
 
 // Upsert executes an UPSERT using ON DUPLICATE KEY UPDATE.
 func (q *Query) Upsert(data []map[string]any, unique []string, updateCols []string) (sql.Result, error) {
+	plan, err := q.planUpsert(q.ctx, data, unique, updateCols)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensurePlanExecutable(plan); err != nil {
+		return nil, err
+	}
+	return q.execStmt(plan.SQL, plan.Params...)
+}
+
+func (q *Query) planUpsert(ctx context.Context, data []map[string]any, unique []string, updateCols []string) (*QueryPlan, error) {
+	_ = ctx
+	if q.err != nil {
+		return nil, q.err
+	}
 	ib := newInsertBuilder(q.dialect)
 	ib.Table(q.builder.GetQuery().Table.Name).Upsert(data, unique, updateCols)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
 		return nil, err
 	}
-	return q.execStmt(sqlStr, args...)
+	plan := newQueryPlan(OperationInsert, sqlStr, args)
+	plan.Tables = append(plan.Tables, TableRef{Name: q.builder.GetQuery().Table.Name})
+	plan.Columns = columnRefsFromNames(sortedBatchMapKeys(data))
+	plan.Metadata = map[string]any{"insert_mode": "upsert", "unique_columns": unique, "update_columns": updateCols}
+	q.finalizePlan(plan)
+	return plan, nil
 }
 
 // UpdateOrInsert performs UPDATE or INSERT based on condition.
 func (q *Query) UpdateOrInsert(cond map[string]any, values map[string]any) (sql.Result, error) {
+	plan, err := q.planUpdateOrInsert(q.ctx, cond, values)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensurePlanExecutable(plan); err != nil {
+		return nil, err
+	}
+	return q.execStmt(plan.SQL, plan.Params...)
+}
+
+func (q *Query) planUpdateOrInsert(ctx context.Context, cond map[string]any, values map[string]any) (*QueryPlan, error) {
+	_ = ctx
+	if q.err != nil {
+		return nil, q.err
+	}
 	ib := newInsertBuilder(q.dialect)
 	ib.Table(q.builder.GetQuery().Table.Name).UpdateOrInsert(cond, values)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
 		return nil, err
 	}
-	return q.execStmt(sqlStr, args...)
+	plan := newQueryPlan(OperationInsert, sqlStr, args)
+	plan.Tables = append(plan.Tables, TableRef{Name: q.builder.GetQuery().Table.Name})
+	merged := make(map[string]any, len(cond)+len(values))
+	for k, v := range cond {
+		merged[k] = v
+	}
+	for k, v := range values {
+		merged[k] = v
+	}
+	plan.Columns = columnRefsFromNames(sortedMapKeys(merged))
+	plan.Metadata = map[string]any{"insert_mode": "update_or_insert", "condition_columns": sortedMapKeys(cond), "update_columns": sortedMapKeys(values)}
+	q.finalizePlan(plan)
+	return plan, nil
 }
 
 // InsertUsing executes an INSERT INTO ... SELECT statement using columns from a subquery.
 func (q *Query) InsertUsing(columns []string, sub *Query) (sql.Result, error) {
+	plan, err := q.planInsertUsing(q.ctx, columns, sub)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensurePlanExecutable(plan); err != nil {
+		return nil, err
+	}
+	return q.execStmt(plan.SQL, plan.Params...)
+}
+
+func (q *Query) planInsertUsing(ctx context.Context, columns []string, sub *Query) (*QueryPlan, error) {
+	_ = ctx
+	if q.err != nil {
+		return nil, q.err
+	}
 	ib := newInsertBuilder(q.dialect)
 	ib.Table(q.builder.GetQuery().Table.Name).InsertUsing(columns, sub.builder)
 	sqlStr, args, err := ib.Build()
 	if err != nil {
 		return nil, err
 	}
-	return q.execStmt(sqlStr, args...)
+	plan := newQueryPlan(OperationInsert, sqlStr, args)
+	plan.Tables = append(plan.Tables, TableRef{Name: q.builder.GetQuery().Table.Name})
+	plan.Columns = columnRefsFromNames(columns)
+	plan.Metadata = map[string]any{"insert_mode": "insert_using"}
+	q.finalizePlan(plan)
+	return plan, nil
 }
 
 // Update executes an UPDATE with the given data.
 func (q *Query) Update(data any) (sql.Result, error) {
+	plan, err := q.PlanUpdate(q.ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensurePlanExecutable(plan); err != nil {
+		return nil, err
+	}
+	return q.execStmt(plan.SQL, plan.Params...)
+}
+
+// PlanUpdate builds an UPDATE plan for data without executing it.
+func (q *Query) PlanUpdate(ctx context.Context, data any) (*QueryPlan, error) {
+	_ = ctx
+	if q.err != nil {
+		return nil, q.err
+	}
+	q.applyPolicyPredicates()
 	m, err := dataToMap(data)
 	if err != nil {
 		return nil, err
@@ -969,11 +1220,33 @@ func (q *Query) Update(data any) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return q.execStmt(sqlStr, args...)
+	plan := newQueryPlan(OperationUpdate, sqlStr, args)
+	appendTableRef(plan, q.builder.GetQuery().Table.Name, "")
+	plan.Columns = columnRefsFromNames(sortedMapKeys(m))
+	appendSelectBuilderWriteMetadata(plan, q.builder)
+	q.finalizePlan(plan)
+	return plan, nil
 }
 
 // Delete executes a DELETE query using current conditions.
 func (q *Query) Delete() (sql.Result, error) {
+	plan, err := q.PlanDelete(q.ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensurePlanExecutable(plan); err != nil {
+		return nil, err
+	}
+	return q.execStmt(plan.SQL, plan.Params...)
+}
+
+// PlanDelete builds a DELETE plan without executing it.
+func (q *Query) PlanDelete(ctx context.Context) (*QueryPlan, error) {
+	_ = ctx
+	if q.err != nil {
+		return nil, q.err
+	}
+	q.applyPolicyPredicates()
 	delBuilder := newDeleteBuilder(q.dialect)
 	delBuilder.Table(q.builder.GetQuery().Table.Name).Delete()
 	copyBuilderStateDelete(q.builder, delBuilder)
@@ -981,7 +1254,11 @@ func (q *Query) Delete() (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return q.execStmt(sqlStr, args...)
+	plan := newQueryPlan(OperationDelete, sqlStr, args)
+	appendTableRef(plan, q.builder.GetQuery().Table.Name, "")
+	appendSelectBuilderWriteMetadata(plan, q.builder)
+	q.finalizePlan(plan)
+	return plan, nil
 }
 
 // copyBuilderState duplicates where, join and order clauses from src to dst.
