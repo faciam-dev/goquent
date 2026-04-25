@@ -210,15 +210,28 @@ func reviewSQLFile(path string) ([]Finding, error) {
 	if err != nil {
 		return nil, err
 	}
-	if plan, err := migration.PlanSQL(string(b)); err != nil {
-		return nil, err
-	} else if len(plan.Steps) > 0 {
-		findings := warningsToFindings(plan.Warnings, plan.AnalysisPrecision, &query.SourceLocation{File: path, Line: 1})
-		return applyFileSuppressions(path, findings)
+	sqlText := string(b)
+	if looksLikeMigrationSQL(sqlText) {
+		if plan, err := migration.PlanSQL(sqlText); err != nil {
+			return nil, err
+		} else if len(plan.Steps) > 0 {
+			findings := warningsToFindings(plan.Warnings, plan.AnalysisPrecision, &query.SourceLocation{File: path, Line: 1})
+			return applyFileSuppressions(path, findings)
+		}
 	}
-	plan := query.NewRawPlan(string(b))
+	plan := query.NewRawPlan(sqlText)
 	findings := findingsFromPlan(plan, query.AnalysisPrecise, &query.SourceLocation{File: path, Line: 1})
 	return applyFileSuppressions(path, findings)
+}
+
+func looksLikeMigrationSQL(sqlText string) bool {
+	upper := strings.ToUpper(sqlText)
+	for _, token := range []string{"CREATE", "ALTER", "DROP", "RENAME", "GRANT", "REVOKE", "TRUNCATE"} {
+		if containsSQLWord(upper, token) {
+			return true
+		}
+	}
+	return false
 }
 
 func reviewPlanJSONFile(path string) ([]Finding, error) {

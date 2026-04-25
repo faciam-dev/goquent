@@ -23,7 +23,7 @@ func newMockDB(t *testing.T, p BoolScanPolicy) (*DB, sqlmock.Sqlmock) {
 	}
 	t.Cleanup(func() { db.Close() })
 	ormDB := NewDB(db, driver.MySQLDialect{}, WithBoolScanPolicy(p))
-	return ormDB, mock
+	return ormDB.RequireRawApproval("raw bool scan test"), mock
 }
 
 func TestSelectBoolPolicies(t *testing.T) {

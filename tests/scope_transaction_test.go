@@ -67,7 +67,7 @@ func TestUpdateByWithinTransactionCommit(t *testing.T) {
 	}
 
 	var age int
-	if err := db.QueryRowContext(context.Background(), "SELECT age FROM users WHERE id = ?", 1).Scan(&age); err != nil {
+	if err := rawQueryRow(t, db, context.Background(), "SELECT age FROM users WHERE id = ?", 1).Scan(&age); err != nil {
 		t.Fatalf("select after commit: %v", err)
 	}
 	if age != 52 {

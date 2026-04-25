@@ -56,6 +56,21 @@ func TestTenantScopedPolicyWarnings(t *testing.T) {
 	}
 }
 
+func TestTablePolicyAppliesToAliasedTable(t *testing.T) {
+	registerUsersPolicy(t, TablePolicy{TenantColumn: "tenant_id"})
+
+	plan, err := New(&recordingExec{}, "users as u", ormdriver.MySQLDialect{}).
+		Select("u.id").
+		Limit(10).
+		Plan(context.Background())
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	if !warningCodeSet(plan.Warnings)[WarningTenantFilterMissing] {
+		t.Fatalf("expected tenant warning for aliased table, got %#v", plan.Warnings)
+	}
+}
+
 func TestTenantScopedPolicyOnWrites(t *testing.T) {
 	registerUsersPolicy(t, TablePolicy{TenantColumn: "tenant_id"})
 	ctx := context.Background()

@@ -47,6 +47,7 @@ func RegisterTablePolicy(policy TablePolicy) error {
 	if policy.Table == "" {
 		return fmt.Errorf("goquent: policy table is required")
 	}
+	policy.Table = normalizeTableName(policy.Table)
 	policy = normalizeTablePolicy(policy)
 	policyRegistry.Lock()
 	defer policyRegistry.Unlock()
@@ -58,7 +59,7 @@ func RegisterTablePolicy(policy TablePolicy) error {
 func PolicyForTable(table string) (TablePolicy, bool) {
 	policyRegistry.RLock()
 	defer policyRegistry.RUnlock()
-	policy, ok := policyRegistry.byTable[table]
+	policy, ok := policyRegistry.byTable[normalizeTableName(table)]
 	if !ok {
 		return TablePolicy{}, false
 	}
@@ -219,8 +220,9 @@ func policyAppliesToOperation(op OperationType) bool {
 }
 
 func planTouchesTable(plan *QueryPlan, table string) bool {
+	target := normalizeTableName(table)
 	for _, ref := range plan.Tables {
-		if ref.Name == table {
+		if normalizeTableName(ref.Name) == target {
 			return true
 		}
 	}
@@ -285,4 +287,35 @@ func normalizeColumnName(column string) string {
 	}
 	column = strings.Trim(column, "`\"")
 	return strings.ToLower(column)
+}
+
+func normalizeTableName(table string) string {
+	table = strings.TrimSpace(table)
+	if table == "" {
+		return ""
+	}
+	fields := strings.Fields(table)
+	if len(fields) >= 3 && strings.EqualFold(fields[1], "as") {
+		table = fields[0]
+	} else if len(fields) == 2 && isSimpleIdentifierToken(fields[0]) && isSimpleIdentifierToken(fields[1]) {
+		table = fields[0]
+	}
+	table = strings.TrimSpace(table)
+	table = strings.Trim(table, "`\"")
+	return strings.ToLower(table)
+}
+
+func isSimpleIdentifierToken(value string) bool {
+	value = strings.Trim(value, "`\"")
+	if value == "" {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		ch := value[i]
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '$' || ch == '.' {
+			continue
+		}
+		return false
+	}
+	return true
 }

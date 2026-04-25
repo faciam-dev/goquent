@@ -260,6 +260,11 @@ func (q *Query) Where(col string, args ...any) *Query {
 			q.err = fmt.Errorf("invalid operator type")
 			return q
 		}
+		op, err := validateConditionOperator(op)
+		if err != nil {
+			q.err = err
+			return q
+		}
 		q.builder.Where(col, op, args[1])
 	default:
 		q.err = fmt.Errorf("invalid Where usage")
@@ -359,6 +364,13 @@ func (q *Query) Offset(n int) *Query {
 
 // SelectRaw adds a raw select expression.
 func (q *Query) SelectRaw(raw string, values ...any) *Query {
+	if q.err != nil {
+		return q
+	}
+	if err := validateRawSQLFragment(raw); err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.SelectRaw(raw, values...)
 	return q
 }
@@ -431,6 +443,14 @@ func (q *Query) Avg(col string) *Query { q.builder.Avg(col); return q }
 
 // Join adds INNER JOIN clause.
 func (q *Query) Join(table, localColumn, cond, target string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.Join(table, localColumn, cond, target)
 	return q
 }
@@ -455,18 +475,42 @@ func (q *Query) RightJoinQuery(table string, fn func(b *qbapi.JoinClauseQueryBui
 
 // JoinSubQuery joins a subquery with alias and join condition.
 func (q *Query) JoinSubQuery(sub *Query, alias, my, condition, target string) *Query {
+	if q.err != nil {
+		return q
+	}
+	condition, err := validateConditionOperator(condition)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.JoinSubQuery(sub.builder, alias, my, condition, target)
 	return q
 }
 
 // LeftJoinSubQuery performs a LEFT JOIN using a subquery.
 func (q *Query) LeftJoinSubQuery(sub *Query, alias, my, condition, target string) *Query {
+	if q.err != nil {
+		return q
+	}
+	condition, err := validateConditionOperator(condition)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.LeftJoinSubQuery(sub.builder, alias, my, condition, target)
 	return q
 }
 
 // RightJoinSubQuery performs a RIGHT JOIN using a subquery.
 func (q *Query) RightJoinSubQuery(sub *Query, alias, my, condition, target string) *Query {
+	if q.err != nil {
+		return q
+	}
+	condition, err := validateConditionOperator(condition)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.RightJoinSubQuery(sub.builder, alias, my, condition, target)
 	return q
 }
@@ -485,12 +529,28 @@ func (q *Query) LeftJoinLateral(sub *Query, alias string) *Query {
 
 // LeftJoin adds LEFT JOIN clause.
 func (q *Query) LeftJoin(table, localColumn, cond, target string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.LeftJoin(table, localColumn, cond, target)
 	return q
 }
 
 // RightJoin adds RIGHT JOIN clause.
 func (q *Query) RightJoin(table, localColumn, cond, target string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.RightJoin(table, localColumn, cond, target)
 	return q
 }
@@ -503,12 +563,27 @@ func (q *Query) CrossJoin(table string) *Query {
 
 // OrderBy adds ORDER BY clause.
 func (q *Query) OrderBy(col, dir string) *Query {
+	if q.err != nil {
+		return q
+	}
+	dir, err := validateOrderDirection(dir)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.OrderBy(col, dir)
 	return q
 }
 
 // OrderByRaw adds raw ORDER BY clause.
 func (q *Query) OrderByRaw(raw string) *Query {
+	if q.err != nil {
+		return q
+	}
+	if err := validateRawSQLFragment(raw); err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.OrderByRaw(raw)
 	return q
 }
@@ -527,24 +602,54 @@ func (q *Query) GroupBy(cols ...string) *Query {
 
 // Having adds HAVING condition.
 func (q *Query) Having(col, cond string, val any) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.Having(col, cond, val)
 	return q
 }
 
 // HavingRaw adds raw HAVING condition.
 func (q *Query) HavingRaw(raw string) *Query {
+	if q.err != nil {
+		return q
+	}
+	if err := validateRawSQLFragment(raw); err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.HavingRaw(raw)
 	return q
 }
 
 // OrHaving adds OR HAVING condition.
 func (q *Query) OrHaving(col, cond string, val any) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.OrHaving(col, cond, val)
 	return q
 }
 
 // OrHavingRaw adds raw OR HAVING condition.
 func (q *Query) OrHavingRaw(raw string) *Query {
+	if q.err != nil {
+		return q
+	}
+	if err := validateRawSQLFragment(raw); err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.OrHavingRaw(raw)
 	return q
 }
@@ -563,6 +668,11 @@ func (q *Query) OrWhere(col string, args ...any) *Query {
 			q.err = fmt.Errorf("invalid operator type")
 			return q
 		}
+		op, err := validateConditionOperator(op)
+		if err != nil {
+			q.err = err
+			return q
+		}
 		q.builder.OrWhere(col, op, args[1])
 	default:
 		q.err = fmt.Errorf("invalid OrWhere usage")
@@ -572,64 +682,116 @@ func (q *Query) OrWhere(col string, args ...any) *Query {
 
 // WhereRaw appends raw WHERE condition.
 func (q *Query) WhereRaw(raw string, vals map[string]any) *Query {
+	if q.err != nil {
+		return q
+	}
+	if err := validateRawSQLFragment(raw); err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.WhereRaw(raw, vals)
 	return q
 }
 
 // OrWhereRaw appends raw OR WHERE condition.
 func (q *Query) OrWhereRaw(raw string, vals map[string]any) *Query {
+	if q.err != nil {
+		return q
+	}
+	if err := validateRawSQLFragment(raw); err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.OrWhereRaw(raw, vals)
 	return q
 }
 
 // SafeWhereRaw appends a raw WHERE condition ensuring a values map is always used.
 func (q *Query) SafeWhereRaw(raw string, vals map[string]any) *Query {
+	if q.err != nil {
+		return q
+	}
+	if err := validateRawSQLFragment(raw); err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.SafeWhereRaw(raw, vals)
 	return q
 }
 
 // SafeOrWhereRaw appends a raw OR WHERE condition ensuring a values map is used.
 func (q *Query) SafeOrWhereRaw(raw string, vals map[string]any) *Query {
+	if q.err != nil {
+		return q
+	}
+	if err := validateRawSQLFragment(raw); err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.SafeOrWhereRaw(raw, vals)
 	return q
 }
 
 // WhereGroup groups conditions with parentheses using AND logic.
 func (q *Query) WhereGroup(fn func(g *Query)) *Query {
+	if q.err != nil {
+		return q
+	}
 	q.builder.WhereGroup(func(b *qbapi.WhereSelectQueryBuilder) {
 		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
 		_ = setFieldValue(reflect.ValueOf(&grp.builder.WhereQueryBuilder), "builder", reflect.ValueOf(b.GetBuilder()))
 		fn(grp)
+		if grp.err != nil {
+			q.err = grp.err
+		}
 	})
 	return q
 }
 
 // OrWhereGroup groups conditions with parentheses using OR logic.
 func (q *Query) OrWhereGroup(fn func(g *Query)) *Query {
+	if q.err != nil {
+		return q
+	}
 	q.builder.OrWhereGroup(func(b *qbapi.WhereSelectQueryBuilder) {
 		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
 		_ = setFieldValue(reflect.ValueOf(&grp.builder.WhereQueryBuilder), "builder", reflect.ValueOf(b.GetBuilder()))
 		fn(grp)
+		if grp.err != nil {
+			q.err = grp.err
+		}
 	})
 	return q
 }
 
 // WhereNot groups conditions inside NOT (...).
 func (q *Query) WhereNot(fn func(g *Query)) *Query {
+	if q.err != nil {
+		return q
+	}
 	q.builder.WhereNot(func(b *qbapi.WhereSelectQueryBuilder) {
 		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
 		_ = setFieldValue(reflect.ValueOf(&grp.builder.WhereQueryBuilder), "builder", reflect.ValueOf(b.GetBuilder()))
 		fn(grp)
+		if grp.err != nil {
+			q.err = grp.err
+		}
 	})
 	return q
 }
 
 // OrWhereNot groups conditions inside OR NOT (...).
 func (q *Query) OrWhereNot(fn func(g *Query)) *Query {
+	if q.err != nil {
+		return q
+	}
 	q.builder.OrWhereNot(func(b *qbapi.WhereSelectQueryBuilder) {
 		grp := &Query{builder: q.builder, exec: q.exec, ctx: q.ctx}
 		_ = setFieldValue(reflect.ValueOf(&grp.builder.WhereQueryBuilder), "builder", reflect.ValueOf(b.GetBuilder()))
 		fn(grp)
+		if grp.err != nil {
+			q.err = grp.err
+		}
 	})
 	return q
 }
@@ -684,12 +846,28 @@ func (q *Query) OrWhereNotInSubQuery(col string, sub *Query) *Query {
 
 // WhereAny adds grouped OR conditions across columns.
 func (q *Query) WhereAny(cols []string, cond string, val any) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.WhereAny(cols, cond, val)
 	return q
 }
 
 // WhereAll adds grouped AND conditions across columns.
 func (q *Query) WhereAll(cols []string, cond string, val any) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.WhereAll(cols, cond, val)
 	return q
 }
@@ -706,6 +884,12 @@ func (q *Query) WhereColumn(col string, args ...string) *Query {
 		other = args[1]
 	default:
 		q.err = fmt.Errorf("invalid WhereColumn usage")
+		return q
+	}
+	var err error
+	op, err = validateConditionOperator(op)
+	if err != nil {
+		q.err = err
 		return q
 	}
 	columnsPair := []string{col, other}
@@ -727,6 +911,12 @@ func (q *Query) OrWhereColumn(col string, args ...string) *Query {
 		q.err = fmt.Errorf("invalid OrWhereColumn usage")
 		return q
 	}
+	var err error
+	op, err = validateConditionOperator(op)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	columnsPair := []string{col, other}
 	q.builder.OrWhereColumn(columnsPair, col, op, other)
 	return q
@@ -734,8 +924,15 @@ func (q *Query) OrWhereColumn(col string, args ...string) *Query {
 
 // WhereColumns adds multiple column comparison conditions joined by AND.
 func (q *Query) WhereColumns(columns [][]string) *Query {
+	if q.err != nil {
+		return q
+	}
 	all, err := gatherColumns(columns)
 	if err != nil {
+		q.err = err
+		return q
+	}
+	if err := validateColumnComparisons(columns); err != nil {
 		q.err = err
 		return q
 	}
@@ -745,8 +942,15 @@ func (q *Query) WhereColumns(columns [][]string) *Query {
 
 // OrWhereColumns adds multiple column comparison conditions joined by OR.
 func (q *Query) OrWhereColumns(columns [][]string) *Query {
+	if q.err != nil {
+		return q
+	}
 	all, err := gatherColumns(columns)
 	if err != nil {
+		q.err = err
+		return q
+	}
+	if err := validateColumnComparisons(columns); err != nil {
 		q.err = err
 		return q
 	}
@@ -868,60 +1072,140 @@ func (q *Query) OrWhereNotExists(sub *Query) *Query {
 
 // WhereDate adds WHERE DATE(column) comparison condition.
 func (q *Query) WhereDate(col, cond, date string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.WhereDate(col, cond, date)
 	return q
 }
 
 // OrWhereDate adds OR WHERE DATE(column) comparison condition.
 func (q *Query) OrWhereDate(col, cond, date string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.OrWhereDate(col, cond, date)
 	return q
 }
 
 // WhereTime adds WHERE TIME(column) comparison condition.
 func (q *Query) WhereTime(col, cond, time string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.WhereTime(col, cond, time)
 	return q
 }
 
 // OrWhereTime adds OR WHERE TIME(column) comparison condition.
 func (q *Query) OrWhereTime(col, cond, time string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.OrWhereTime(col, cond, time)
 	return q
 }
 
 // WhereDay adds WHERE DAY(column) comparison condition.
 func (q *Query) WhereDay(col, cond, day string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.WhereDay(col, cond, day)
 	return q
 }
 
 // OrWhereDay adds OR WHERE DAY(column) comparison condition.
 func (q *Query) OrWhereDay(col, cond, day string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.OrWhereDay(col, cond, day)
 	return q
 }
 
 // WhereMonth adds WHERE MONTH(column) comparison condition.
 func (q *Query) WhereMonth(col, cond, month string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.WhereMonth(col, cond, month)
 	return q
 }
 
 // OrWhereMonth adds OR WHERE MONTH(column) comparison condition.
 func (q *Query) OrWhereMonth(col, cond, month string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.OrWhereMonth(col, cond, month)
 	return q
 }
 
 // WhereYear adds WHERE YEAR(column) comparison condition.
 func (q *Query) WhereYear(col, cond, year string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.WhereYear(col, cond, year)
 	return q
 }
 
 // OrWhereYear adds OR WHERE YEAR(column) comparison condition.
 func (q *Query) OrWhereYear(col, cond, year string) *Query {
+	if q.err != nil {
+		return q
+	}
+	cond, err := validateConditionOperator(cond)
+	if err != nil {
+		q.err = err
+		return q
+	}
 	q.builder.OrWhereYear(col, cond, year)
 	return q
 }
@@ -945,13 +1229,28 @@ func (q *Query) LockForUpdate() *Query {
 }
 
 // Build returns the SQL and args.
-func (q *Query) Build() (string, []any, error) { return q.builder.Build() }
+func (q *Query) Build() (string, []any, error) {
+	if q.err != nil {
+		return "", nil, q.err
+	}
+	return q.builder.Build()
+}
 
 // Dump returns SQL and args for debugging.
-func (q *Query) Dump() (string, []any, error) { return q.builder.Dump() }
+func (q *Query) Dump() (string, []any, error) {
+	if q.err != nil {
+		return "", nil, q.err
+	}
+	return q.builder.Dump()
+}
 
 // RawSQL returns interpolated SQL for debugging.
-func (q *Query) RawSQL() (string, error) { return q.builder.RawSql() }
+func (q *Query) RawSQL() (string, error) {
+	if q.err != nil {
+		return "", q.err
+	}
+	return q.builder.RawSql()
+}
 
 func dataToMap(data any) (map[string]any, error) {
 	if m, ok := data.(map[string]any); ok {
@@ -1467,6 +1766,61 @@ func copyValueByReflection(dst, src reflect.Value) bool {
 	default:
 		return false
 	}
+}
+
+func validateConditionOperator(op string) (string, error) {
+	op = strings.TrimSpace(op)
+	switch strings.ToUpper(op) {
+	case "=", "!=", "<>", ">", ">=", "<", "<=", "LIKE", "NOT LIKE":
+		return op, nil
+	default:
+		return "", fmt.Errorf("goquent: unsupported SQL operator %q", op)
+	}
+}
+
+func validateOrderDirection(dir string) (string, error) {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return "asc", nil
+	}
+	switch strings.ToUpper(dir) {
+	case "ASC", "DESC":
+		return dir, nil
+	default:
+		return "", fmt.Errorf("goquent: unsupported ORDER BY direction %q", dir)
+	}
+}
+
+func validateRawSQLFragment(raw string) error {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return fmt.Errorf("goquent: raw SQL fragment is required")
+	}
+	if strings.ContainsAny(trimmed, ";\x00") ||
+		strings.Contains(trimmed, "--") ||
+		strings.Contains(trimmed, "/*") ||
+		strings.Contains(trimmed, "*/") {
+		return fmt.Errorf("goquent: raw SQL fragment contains a statement separator or comment")
+	}
+	upper := strings.ToUpper(trimmed)
+	for _, token := range []string{"ALTER", "CREATE", "DELETE", "DROP", "GRANT", "INSERT", "REVOKE", "TRUNCATE", "UPDATE"} {
+		if containsSQLWord(upper, token) {
+			return fmt.Errorf("goquent: raw SQL fragment contains disallowed SQL token %q", token)
+		}
+	}
+	return nil
+}
+
+func validateColumnComparisons(columns [][]string) error {
+	for _, c := range columns {
+		if len(c) != 3 {
+			continue
+		}
+		if _, err := validateConditionOperator(c[1]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // gatherColumns extracts unique column names from column comparison slices.

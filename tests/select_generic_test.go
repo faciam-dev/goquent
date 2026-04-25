@@ -10,8 +10,9 @@ import (
 func TestSelectOneMap(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
+	rawDB := db.RequireRawApproval("raw generic select test")
 	ctx := context.Background()
-	row, err := orm.SelectOne[map[string]any](ctx, db, "SELECT id, name FROM users WHERE id = ?", 1)
+	row, err := orm.SelectOne[map[string]any](ctx, rawDB, "SELECT id, name FROM users WHERE id = ?", 1)
 	if err != nil {
 		t.Fatalf("select map: %v", err)
 	}
@@ -23,8 +24,9 @@ func TestSelectOneMap(t *testing.T) {
 func TestSelectAllStruct(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
+	rawDB := db.RequireRawApproval("raw generic select test")
 	ctx := context.Background()
-	users, err := orm.SelectAll[User](ctx, db, "SELECT id, name, age FROM users ORDER BY id")
+	users, err := orm.SelectAll[User](ctx, rawDB, "SELECT id, name, age FROM users ORDER BY id")
 	if err != nil {
 		t.Fatalf("select structs: %v", err)
 	}
@@ -39,8 +41,9 @@ func TestSelectAllStruct(t *testing.T) {
 func TestSelectAllStructTag(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
+	rawDB := db.RequireRawApproval("raw generic select test")
 	ctx := context.Background()
-	users, err := orm.SelectAll[UserSchema](ctx, db, "SELECT id, name, age, schema_name FROM users ORDER BY id")
+	users, err := orm.SelectAll[UserSchema](ctx, rawDB, "SELECT id, name, age, schema_name FROM users ORDER BY id")
 	if err != nil {
 		t.Fatalf("select structs: %v", err)
 	}
@@ -55,8 +58,9 @@ func TestSelectAllStructTag(t *testing.T) {
 func TestSelectStructAlias(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()
+	rawDB := db.RequireRawApproval("raw generic select test")
 	ctx := context.Background()
-	u, err := orm.SelectOne[User](ctx, db, "SELECT id AS ID, name AS Name, age FROM users WHERE id = ?", 1)
+	u, err := orm.SelectOne[User](ctx, rawDB, "SELECT id AS ID, name AS Name, age FROM users WHERE id = ?", 1)
 	if err != nil {
 		t.Fatalf("select alias: %v", err)
 	}

@@ -31,9 +31,11 @@ type executor interface {
 
 // DB provides main ORM interface.
 type DB struct {
-	drv      *driver.Driver
-	exec     executor
-	scanOpts ScanOptions
+	drv         *driver.Driver
+	exec        executor
+	scanOpts    ScanOptions
+	rawApproval *query.Approval
+	rawErr      error
 }
 
 // Option configures DB at creation.
@@ -71,6 +73,21 @@ func newDB(d *driver.Driver, exec executor, opts ...Option) *DB {
 		o(db)
 	}
 	return db
+}
+
+// RequireRawApproval returns a shallow DB copy that can execute risky raw SQL
+// with an explicit approval reason.
+func (db *DB) RequireRawApproval(reason string) *DB {
+	next := *db
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		next.rawErr = query.ErrApprovalReasonRequired
+		next.rawApproval = nil
+		return &next
+	}
+	next.rawErr = nil
+	next.rawApproval = &query.Approval{Reason: reason, CreatedAt: time.Now().UTC()}
+	return &next
 }
 
 // NewDB wraps an existing sql.DB with a dialect into DB.
@@ -128,7 +145,7 @@ func (db *DB) Close() error { return db.drv.Close() }
 
 // newTransactionDB wraps a sql.Tx in a DB instance bound to the same driver.
 func (db *DB) newTransactionDB(tx *sql.Tx) *DB {
-	return &DB{drv: db.drv, exec: tx, scanOpts: db.scanOpts}
+	return &DB{drv: db.drv, exec: tx, scanOpts: db.scanOpts, rawApproval: db.rawApproval, rawErr: db.rawErr}
 }
 
 // Tx represents a transaction-scoped DB wrapper.
@@ -183,44 +200,112 @@ func (db *DB) Table(name string) *query.Query {
 	return query.New(db.exec, name, db.drv.Dialect)
 }
 
+func (db *DB) rawPlan(ctx context.Context, q string, args ...any) (*query.QueryPlan, error) {
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+	}
+	if db.rawErr != nil {
+		return nil, db.rawErr
+	}
+	plan := query.NewRawPlan(q, args...)
+	if db.rawApproval != nil {
+		copied := *db.rawApproval
+		plan.Approval = &copied
+	}
+	return plan, nil
+}
+
+func (db *DB) ensureRawExecutable(ctx context.Context, q string, args ...any) (*query.QueryPlan, error) {
+	plan, err := db.rawPlan(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	if err := query.EnsurePlanExecutable(plan); err != nil {
+		return plan, err
+	}
+	return plan, nil
+}
+
+func (db *DB) queryContextTrusted(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
+	if ctx != nil {
+		return db.exec.QueryContext(ctx, q, args...)
+	}
+	return db.exec.Query(q, args...)
+}
+
+func (db *DB) execContextTrusted(ctx context.Context, q string, args ...any) (sql.Result, error) {
+	if ctx != nil {
+		return db.exec.ExecContext(ctx, q, args...)
+	}
+	return db.exec.Exec(q, args...)
+}
+
 // Query runs a raw SQL query returning multiple rows.
 func (db *DB) Query(q string, args ...any) (*sql.Rows, error) {
-	_ = query.NewRawPlan(q, args...)
-	return db.exec.Query(q, args...)
+	if _, err := db.ensureRawExecutable(nil, q, args...); err != nil {
+		return nil, err
+	}
+	return db.queryContextTrusted(nil, q, args...)
 }
 
 // QueryContext runs Query with a context.
 func (db *DB) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
-	_ = query.NewRawPlan(q, args...)
-	return db.exec.QueryContext(ctx, q, args...)
+	if _, err := db.ensureRawExecutable(ctx, q, args...); err != nil {
+		return nil, err
+	}
+	return db.queryContextTrusted(ctx, q, args...)
 }
 
 // RawPlan creates a plan for caller-supplied SQL without executing it.
 func (db *DB) RawPlan(ctx context.Context, q string, args ...any) (*QueryPlan, error) {
-	_ = ctx
-	return query.NewRawPlan(q, args...), nil
+	return db.rawPlan(ctx, q, args...)
 }
 
 // Exec executes a raw SQL statement.
 func (db *DB) Exec(q string, args ...any) (sql.Result, error) {
-	_ = query.NewRawPlan(q, args...)
-	return db.exec.Exec(q, args...)
+	if _, err := db.ensureRawExecutable(nil, q, args...); err != nil {
+		return nil, err
+	}
+	return db.execContextTrusted(nil, q, args...)
 }
 
 // ExecContext executes a raw SQL statement with a context.
 func (db *DB) ExecContext(ctx context.Context, q string, args ...any) (sql.Result, error) {
-	_ = query.NewRawPlan(q, args...)
-	return db.exec.ExecContext(ctx, q, args...)
+	if _, err := db.ensureRawExecutable(ctx, q, args...); err != nil {
+		return nil, err
+	}
+	return db.execContextTrusted(ctx, q, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
+//
+// Deprecated: use QueryRowE so raw SQL safety errors can be returned before
+// Scan. QueryRow cannot surface pre-execution approval errors because *sql.Row
+// has no public error constructor.
 func (db *DB) QueryRow(q string, args ...any) *sql.Row {
 	_ = query.NewRawPlan(q, args...)
 	return db.exec.QueryRow(q, args...)
 }
 
 // QueryRowContext executes a query with context returning at most one row.
+//
+// Deprecated: use QueryRowE so raw SQL safety errors can be returned before
+// Scan. QueryRowContext cannot surface pre-execution approval errors because
+// *sql.Row has no public error constructor.
 func (db *DB) QueryRowContext(ctx context.Context, q string, args ...any) *sql.Row {
 	_ = query.NewRawPlan(q, args...)
 	return db.exec.QueryRowContext(ctx, q, args...)
+}
+
+// QueryRowE validates raw SQL policy and executes a context-aware single-row query.
+func (db *DB) QueryRowE(ctx context.Context, q string, args ...any) (*sql.Row, error) {
+	if _, err := db.ensureRawExecutable(ctx, q, args...); err != nil {
+		return nil, err
+	}
+	if ctx == nil {
+		return db.exec.QueryRow(q, args...), nil
+	}
+	return db.exec.QueryRowContext(ctx, q, args...), nil
 }

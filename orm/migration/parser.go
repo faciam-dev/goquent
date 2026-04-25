@@ -219,7 +219,9 @@ func parseMigrationStatement(statement sqlStatement) MigrationStep {
 		step.AnalysisPrecision = query.AnalysisUnsupported
 		return step
 	}
-	return MigrationStep{}
+	step.Type = UnsupportedStep
+	step.AnalysisPrecision = query.AnalysisUnsupported
+	return step
 }
 
 func classifyStep(step *MigrationStep) {
@@ -324,13 +326,13 @@ func classifyStep(step *MigrationStep) {
 			step.Line,
 		))
 	case UnsupportedStep:
-		step.RiskLevel = query.RiskHigh
+		step.RiskLevel = query.RiskBlocked
 		step.Warnings = append(step.Warnings, newWarning(
 			WarningMigrationUnsupported,
-			query.RiskHigh,
+			query.RiskBlocked,
 			"migration statement could not be classified",
-			"review this DDL manually or add a structured migration plan",
-			true,
+			"review this SQL manually and add a structured migration plan before applying",
+			false,
 			step.Line,
 		))
 	}

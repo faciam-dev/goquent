@@ -235,7 +235,7 @@ func Insert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 	if len(o.returning) > 0 {
 		return execReturningRows(ctx, db, sqlStr, args...)
 	}
-	return db.ExecContext(ctx, sqlStr, args...)
+	return db.execContextTrusted(ctx, sqlStr, args...)
 }
 
 // Update updates record v.
@@ -346,7 +346,7 @@ func Update[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 	if len(o.returning) > 0 {
 		return execReturningRows(ctx, db, sqlStr, args...)
 	}
-	return db.ExecContext(ctx, sqlStr, args...)
+	return db.execContextTrusted(ctx, sqlStr, args...)
 }
 
 // Upsert inserts or updates v using primary keys.
@@ -497,5 +497,5 @@ func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 	if len(o.returning) > 0 {
 		return execReturningRows(ctx, db, sqlStr, args...)
 	}
-	return db.ExecContext(ctx, sqlStr, args...)
+	return db.execContextTrusted(ctx, sqlStr, args...)
 }

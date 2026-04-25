@@ -32,7 +32,7 @@ func TestInsertStructGeneric(t *testing.T) {
 		t.Fatalf("insert struct: %v", err)
 	}
 	var cnt int
-	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE name = ?", u.Name).Scan(&cnt); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT COUNT(*) FROM users WHERE name = ?", u.Name).Scan(&cnt); err != nil {
 		t.Fatalf("count: %v", err)
 	}
 	if cnt != 1 {
@@ -49,7 +49,7 @@ func TestInsertMapGeneric(t *testing.T) {
 		t.Fatalf("insert map: %v", err)
 	}
 	var cnt int
-	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE name = ?", "mapg").Scan(&cnt); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT COUNT(*) FROM users WHERE name = ?", "mapg").Scan(&cnt); err != nil {
 		t.Fatalf("count: %v", err)
 	}
 	if cnt != 1 {
@@ -66,7 +66,7 @@ func TestUpdateStructWherePK(t *testing.T) {
 		t.Fatalf("update: %v", err)
 	}
 	var name string
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = 1").Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = 1").Scan(&name); err != nil {
 		t.Fatalf("select: %v", err)
 	}
 	if name != "alice2" {
@@ -94,7 +94,7 @@ func TestUpsertStruct(t *testing.T) {
 		t.Fatalf("upsert update: %v", err)
 	}
 	var name string
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = 2").Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = 2").Scan(&name); err != nil {
 		t.Fatalf("select: %v", err)
 	}
 	if name != "bob2" {
@@ -105,7 +105,7 @@ func TestUpsertStruct(t *testing.T) {
 	if _, err := orm.Upsert(ctx, db, u2, orm.WherePK()); err != nil {
 		t.Fatalf("upsert insert: %v", err)
 	}
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = 10").Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = 10").Scan(&name); err != nil {
 		t.Fatalf("select2: %v", err)
 	}
 	if name != "newg" {
@@ -122,7 +122,7 @@ func TestUpdateMapWherePK(t *testing.T) {
 		t.Fatalf("update map: %v", err)
 	}
 	var name string
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = 1").Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = 1").Scan(&name); err != nil {
 		t.Fatalf("select: %v", err)
 	}
 	if name != "alice4" {
@@ -150,7 +150,7 @@ func TestUpsertMap(t *testing.T) {
 		t.Fatalf("upsert update: %v", err)
 	}
 	var name string
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = 2").Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = 2").Scan(&name); err != nil {
 		t.Fatalf("select: %v", err)
 	}
 	if name != "bob3" {
@@ -161,7 +161,7 @@ func TestUpsertMap(t *testing.T) {
 	if _, err := orm.Upsert(ctx, db, m2, orm.Table("users"), orm.PK("id"), orm.WherePK()); err != nil {
 		t.Fatalf("upsert insert: %v", err)
 	}
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = 11").Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = 11").Scan(&name); err != nil {
 		t.Fatalf("select2: %v", err)
 	}
 	if name != "mapnew" {
@@ -178,7 +178,7 @@ func TestUpsertStructNoUpdate(t *testing.T) {
 		t.Fatalf("upsert no update: %v", err)
 	}
 	var name string
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = 2").Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = 2").Scan(&name); err != nil {
 		t.Fatalf("select: %v", err)
 	}
 	if name != "bob" {
@@ -203,7 +203,7 @@ func TestUpsertStructKeepsPKWhenFiltered(t *testing.T) {
 	}
 
 	var name string
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = ?", 2).Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = ?", 2).Scan(&name); err != nil {
 		t.Fatalf("select: %v", err)
 	}
 	if name != "bob_filtered" {
@@ -230,7 +230,7 @@ func TestUpsertMapKeepsPKWhenFiltered(t *testing.T) {
 	}
 
 	var name string
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = ?", 2).Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = ?", 2).Scan(&name); err != nil {
 		t.Fatalf("select: %v", err)
 	}
 	if name != "bob_map_filtered" {
@@ -248,7 +248,7 @@ func TestUpsertStructKeepsPKWhenOmitEmptyDropsOtherColumns(t *testing.T) {
 	}
 
 	var name sql.NullString
-	if err := db.QueryRowContext(ctx, "SELECT name FROM users WHERE id = ?", 12).Scan(&name); err != nil {
+	if err := rawQueryRow(t, db, ctx, "SELECT name FROM users WHERE id = ?", 12).Scan(&name); err != nil {
 		t.Fatalf("select: %v", err)
 	}
 	if name.Valid {

@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -108,6 +109,20 @@ func TestJSONRPCHandleAndServe(t *testing.T) {
 	}
 	if !bytes.Contains(out.Bytes(), []byte("Content-Length:")) || !bytes.Contains(out.Bytes(), []byte("tenant_scope")) {
 		t.Fatalf("expected framed resource response, got %s", out.String())
+	}
+}
+
+func TestReadMessageRejectsInvalidContentLength(t *testing.T) {
+	for name, input := range map[string]string{
+		"negative": "Content-Length: -1\r\n\r\n",
+		"tooLarge": "Content-Length: 1048577\r\n\r\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := readMessage(bufio.NewReader(strings.NewReader(input)))
+			if err == nil {
+				t.Fatal("expected invalid Content-Length error")
+			}
+		})
 	}
 }
 

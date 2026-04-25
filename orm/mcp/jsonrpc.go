@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+const maxMessageBytes = 1 << 20
+
 type rpcRequest struct {
 	JSONRPC string           `json:"jsonrpc,omitempty"`
 	ID      *json.RawMessage `json:"id,omitempty"`
@@ -152,24 +154,30 @@ func marshalRPC(resp rpcResponse) []byte {
 }
 
 func readMessage(r *bufio.Reader) ([]byte, error) {
-	line, err := r.ReadString('\n')
-	if err != nil {
-		return nil, err
-	}
-	line = strings.TrimRight(line, "\r\n")
-	if strings.TrimSpace(line) == "" {
-		return readMessage(r)
+	var line string
+	for {
+		next, err := r.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		line = strings.TrimRight(next, "\r\n")
+		if strings.TrimSpace(line) != "" {
+			break
+		}
 	}
 	if !strings.HasPrefix(strings.ToLower(line), "content-length:") {
 		return []byte(line), nil
 	}
-	lengthText := strings.TrimSpace(strings.TrimPrefix(line, "Content-Length:"))
-	if lengthText == line {
-		lengthText = strings.TrimSpace(strings.TrimPrefix(line, "content-length:"))
+	_, lengthText, ok := strings.Cut(line, ":")
+	if !ok {
+		return nil, fmt.Errorf("invalid Content-Length header")
 	}
-	length, err := strconv.Atoi(lengthText)
+	length, err := strconv.Atoi(strings.TrimSpace(lengthText))
 	if err != nil {
 		return nil, err
+	}
+	if length < 0 || length > maxMessageBytes {
+		return nil, fmt.Errorf("invalid Content-Length: %d", length)
 	}
 	for {
 		header, err := r.ReadString('\n')

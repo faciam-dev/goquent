@@ -93,6 +93,28 @@ GRANT SELECT ON users TO app_reader;
 	if plan.Steps[3].Type != UnsupportedStep || plan.Steps[3].AnalysisPrecision != query.AnalysisUnsupported {
 		t.Fatalf("expected unsupported DDL warning, got %#v", plan.Steps[3])
 	}
+	if !plan.Blocked || plan.Steps[3].RiskLevel != query.RiskBlocked {
+		t.Fatalf("expected unsupported DDL to block apply, got blocked=%v step=%#v", plan.Blocked, plan.Steps[3])
+	}
+}
+
+func TestPlanSQLBlocksUnclassifiedDML(t *testing.T) {
+	plan, err := PlanSQL(`
+	DELETE FROM users;
+	TRUNCATE TABLE users;
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Steps) != 2 {
+		t.Fatalf("expected 2 unsupported steps, got %#v", plan.Steps)
+	}
+	if !plan.Blocked || plan.RiskLevel != query.RiskBlocked {
+		t.Fatalf("expected unclassified DML to block apply, risk=%s blocked=%v warnings=%#v", plan.RiskLevel, plan.Blocked, plan.Warnings)
+	}
+	if err := EnsureExecutable(plan); !errors.Is(err, query.ErrBlockedOperation) {
+		t.Fatalf("expected blocked operation, got %v", err)
+	}
 }
 
 func TestClassifyTypeChange(t *testing.T) {

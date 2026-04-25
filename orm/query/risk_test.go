@@ -107,6 +107,24 @@ func TestRequireApprovalReasonRequired(t *testing.T) {
 	}
 }
 
+func TestUnsafeSQLStructureInputsRejected(t *testing.T) {
+	if _, err := newPlanTestQuery(&recordingExec{}).
+		Where("id", "= 1 OR 1=1 --", 1).
+		Plan(context.Background()); err == nil {
+		t.Fatal("expected invalid operator error")
+	}
+	if _, err := newPlanTestQuery(&recordingExec{}).
+		OrderByRaw("id; DROP TABLE users").
+		Plan(context.Background()); err == nil {
+		t.Fatal("expected invalid raw SQL fragment error")
+	}
+	if _, err := newPlanTestQuery(&recordingExec{}).
+		SafeWhereRaw("name = :name; DROP TABLE users", map[string]any{"name": "alice"}).
+		Plan(context.Background()); err == nil {
+		t.Fatal("expected invalid safe raw SQL fragment error")
+	}
+}
+
 func TestSuppressionMVP(t *testing.T) {
 	ctx := context.Background()
 

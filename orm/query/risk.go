@@ -229,6 +229,11 @@ func finalizePlanWithPolicy(plan *QueryPlan, approval *Approval, suppressions []
 	}
 }
 
+// EnsurePlanExecutable enforces approval and block rules for a finalized plan.
+func EnsurePlanExecutable(plan *QueryPlan) error {
+	return ensurePlanExecutable(plan)
+}
+
 func ensurePlanExecutable(plan *QueryPlan) error {
 	if plan == nil {
 		return nil
