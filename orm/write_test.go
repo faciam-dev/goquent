@@ -362,6 +362,85 @@ func TestUpsertPostgresConflictWhere(t *testing.T) {
 	}
 }
 
+func TestUpsertPostgresUpdateColumnsSeparatesInsertAndUpdate(t *testing.T) {
+	db, exec := newCaptureWriteDB(driver.PostgresDialect{})
+
+	_, err := Upsert(
+		context.Background(),
+		db,
+		map[string]any{
+			"id":               "field-1",
+			"tenant_id":        "tenant-1",
+			"form_instance_id": "form-1",
+			"field_key":        "weekly_hours",
+			"value_text":       "40",
+			"needs_update":     false,
+		},
+		Table("form_fields"),
+		ConflictColumns("tenant_id", "form_instance_id", "field_key"),
+		UpdateColumns("value_text", "needs_update"),
+	)
+	if err != nil {
+		t.Fatalf("upsert update columns: %v", err)
+	}
+	if !strings.Contains(exec.query, `"id"`) {
+		t.Fatalf("expected insert-only id column to be present, got: %s", exec.query)
+	}
+	if !strings.Contains(exec.query, `"value_text"=EXCLUDED."value_text"`) || !strings.Contains(exec.query, `"needs_update"=EXCLUDED."needs_update"`) {
+		t.Fatalf("expected explicit update columns, got: %s", exec.query)
+	}
+	for _, col := range []string{`"id"=EXCLUDED."id"`, `"tenant_id"=EXCLUDED."tenant_id"`, `"form_instance_id"=EXCLUDED."form_instance_id"`, `"field_key"=EXCLUDED."field_key"`} {
+		if strings.Contains(exec.query, col) {
+			t.Fatalf("column %s should not be updated: %s", col, exec.query)
+		}
+	}
+}
+
+func TestUpsertConflictDoNothing(t *testing.T) {
+	db, exec := newCaptureWriteDB(driver.PostgresDialect{})
+
+	_, err := Upsert(
+		context.Background(),
+		db,
+		map[string]any{
+			"tenant_id":       "tenant-1",
+			"idempotency_key": "idem-1",
+			"payload_json":    "{}",
+		},
+		Table("submission_attempts"),
+		ConflictColumns("tenant_id", "idempotency_key"),
+		ConflictDoNothing(),
+	)
+	if err != nil {
+		t.Fatalf("upsert do nothing: %v", err)
+	}
+	if !strings.Contains(exec.query, `ON CONFLICT ("tenant_id", "idempotency_key") DO NOTHING`) {
+		t.Fatalf("expected DO NOTHING conflict action, got: %s", exec.query)
+	}
+	if strings.Contains(exec.query, "DO UPDATE") {
+		t.Fatalf("expected no conflict update, got: %s", exec.query)
+	}
+}
+
+func TestUpsertUpdateColumnsRequireInsertedColumn(t *testing.T) {
+	db, _ := newCaptureWriteDB(driver.PostgresDialect{})
+
+	_, err := Upsert(
+		context.Background(),
+		db,
+		map[string]any{
+			"tenant_id": "tenant-1",
+			"field_key": "weekly_hours",
+		},
+		Table("form_fields"),
+		ConflictColumns("tenant_id", "field_key"),
+		UpdateColumns("value_text"),
+	)
+	if err == nil || !strings.Contains(err.Error(), "UpdateColumns requires inserted column value_text") {
+		t.Fatalf("expected missing update column error, got: %v", err)
+	}
+}
+
 func TestUpsertPostgresConflictConstraint(t *testing.T) {
 	db, exec := newCaptureWriteDB(driver.PostgresDialect{})
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/faciam-dev/goquent/orm/query"
 )
@@ -29,6 +30,19 @@ func ApplyScopes(q *query.Query, scopes ...Scope) *query.Query {
 func ComposeScopes(scopes ...Scope) Scope {
 	return func(q *query.Query) *query.Query {
 		return ApplyScopes(q, scopes...)
+	}
+}
+
+// TenantScope adds a tenant filter scope. The default column is tenant_id.
+func TenantScope(tenantID any, column ...string) Scope {
+	col := "tenant_id"
+	if len(column) > 0 {
+		if trimmed := strings.TrimSpace(column[0]); trimmed != "" {
+			col = trimmed
+		}
+	}
+	return func(q *query.Query) *query.Query {
+		return q.Where(col, tenantID)
 	}
 }
 

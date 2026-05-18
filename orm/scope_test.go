@@ -115,6 +115,40 @@ func TestComposeScopesSupportsGroupsAndExists(t *testing.T) {
 	}
 }
 
+func TestTenantScopeAddsDefaultTenantFilter(t *testing.T) {
+	db, _ := newScopeMockDB(t, driver.MySQLDialect{})
+
+	q := ApplyScopes(db.Table("documents"), TenantScope("tenant-1"))
+	sqlStr, args, err := q.Build()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	if !strings.Contains(sqlStr, "WHERE `tenant_id` = ?") {
+		t.Fatalf("expected default tenant filter, got: %s", sqlStr)
+	}
+	if len(args) != 1 || args[0] != "tenant-1" {
+		t.Fatalf("unexpected args: %#v", args)
+	}
+}
+
+func TestTenantScopeAllowsCustomTenantColumn(t *testing.T) {
+	db, _ := newScopeMockDB(t, driver.PostgresDialect{})
+
+	q := ApplyScopes(db.Table("role_bindings"), TenantScope("tenant-1", "scope_tenant_id"))
+	sqlStr, args, err := q.Build()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	if !strings.Contains(sqlStr, `WHERE "scope_tenant_id" = $1`) {
+		t.Fatalf("expected custom tenant filter, got: %s", sqlStr)
+	}
+	if len(args) != 1 || args[0] != "tenant-1" {
+		t.Fatalf("unexpected args: %#v", args)
+	}
+}
+
 func TestSelectAllByBuildsFromScopedQuery(t *testing.T) {
 	ctx := context.Background()
 	db, mock := newScopeMockDB(t, driver.MySQLDialect{})

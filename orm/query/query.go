@@ -693,6 +693,11 @@ func (q *Query) WhereRaw(raw string, vals map[string]any) *Query {
 	return q
 }
 
+// WhereRawNoArgs appends a raw WHERE condition that has no placeholders.
+func (q *Query) WhereRawNoArgs(raw string) *Query {
+	return q.WhereRaw(raw, map[string]any{})
+}
+
 // OrWhereRaw appends raw OR WHERE condition.
 func (q *Query) OrWhereRaw(raw string, vals map[string]any) *Query {
 	if q.err != nil {
@@ -704,6 +709,11 @@ func (q *Query) OrWhereRaw(raw string, vals map[string]any) *Query {
 	}
 	q.builder.OrWhereRaw(raw, vals)
 	return q
+}
+
+// OrWhereRawNoArgs appends a raw OR WHERE condition that has no placeholders.
+func (q *Query) OrWhereRawNoArgs(raw string) *Query {
+	return q.OrWhereRaw(raw, map[string]any{})
 }
 
 // SafeWhereRaw appends a raw WHERE condition ensuring a values map is always used.

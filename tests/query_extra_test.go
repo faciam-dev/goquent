@@ -30,6 +30,23 @@ func TestWhereNullAndNotNull(t *testing.T) {
 	}
 }
 
+func TestWhereRawNoArgs(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	if _, err := db.Table("users").Insert(map[string]any{"name": "raw-null", "age": nil}); err != nil {
+		t.Fatalf("insert null user: %v", err)
+	}
+
+	var row map[string]any
+	if err := db.Table("users").WhereRawNoArgs("age IS NULL").FirstMap(&row); err != nil {
+		t.Fatalf("where raw no args: %v", err)
+	}
+	if row["name"] != "raw-null" {
+		t.Errorf("expected raw-null, got %v", row["name"])
+	}
+}
+
 func TestWhereBetween(t *testing.T) {
 	db := setupDB(t)
 	defer db.Close()

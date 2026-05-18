@@ -88,6 +88,16 @@ users, err := orm.SelectAllBy[User](
 _, err = orm.UpdateBy(ctx, db.Table("users"), map[string]any{"age": 55}, WithProfile(), BioLike("%go%"))
 updated, err := orm.UpdateByReturning[User](ctx, db, db.Table("users"), map[string]any{"age": 55}, WithProfile(), BioLike("%go%"))
 _, err = orm.DeleteBy(ctx, db.Table("users"), WithProfile(), BioLike("%python%"))
+
+tenantUsers, err := orm.SelectAllBy[User](
+    ctx,
+    db,
+    db.Model(&User{}),
+    orm.TenantScope(tenantID),
+    func(q *query.Query) *query.Query {
+        return q.Select("id", "name", "age").Limit(100)
+    },
+)
 ```
 
 ## Read API
@@ -277,6 +287,43 @@ If there are no non-primary-key columns left to update after filtering, the help
 - MySQL: `INSERT IGNORE`
 - PostgreSQL: `ON CONFLICT (...) DO NOTHING`
 
+When the insert payload contains columns that must not be updated on conflict, keep those columns in the insert side and pass `UpdateColumns(...)` for the conflict update side:
+
+```go
+_, err := orm.Upsert(
+    ctx,
+    db,
+    map[string]any{
+        "id":               fieldID,
+        "tenant_id":        tenantID,
+        "form_instance_id": formID,
+        "field_key":        "weekly_hours",
+        "value_text":       "40",
+        "needs_update":     false,
+    },
+    orm.Table("form_fields"),
+    orm.ConflictColumns("tenant_id", "form_instance_id", "field_key"),
+    orm.UpdateColumns("value_text", "needs_update"),
+)
+```
+
+For append-only or idempotency tables where the existing row should not be touched, use `ConflictDoNothing()`:
+
+```go
+_, err := orm.Upsert(
+    ctx,
+    db,
+    map[string]any{
+        "tenant_id":       tenantID,
+        "idempotency_key": key,
+        "payload_json":    payload,
+    },
+    orm.Table("submission_attempts"),
+    orm.ConflictColumns("tenant_id", "idempotency_key"),
+    orm.ConflictDoNothing(),
+)
+```
+
 ```go
 _, err := orm.Upsert(
     ctx,
@@ -437,6 +484,38 @@ _, err := orm.Upsert(
 
 `ConflictConstraint` builds `ON CONFLICT ON CONSTRAINT ...` for PostgreSQL named unique constraints. It cannot be combined with `ConflictColumns(...)` or `ConflictWhere(...)`.
 
+### `UpdateColumns(...)`
+
+`UpdateColumns` limits only the conflict update side of `Upsert` and `UpsertReturning`. The insert side still uses `Columns(...)`, `Omit(...)`, and the required primary-key or conflict columns.
+
+Use it when an insert payload includes application-generated IDs or immutable audit columns that must be written only on the first insert:
+
+```go
+_, err := orm.Upsert(
+    ctx,
+    db,
+    formField,
+    orm.ConflictColumns("tenant_id", "form_instance_id", "field_key"),
+    orm.UpdateColumns("value_text", "value_json", "attachment_required", "needs_update"),
+)
+```
+
+Every column named in `UpdateColumns` must also be present in the insert column set, because PostgreSQL `EXCLUDED` and MySQL `VALUES(...)` read from the attempted insert row.
+
+### `ConflictDoNothing()`
+
+`ConflictDoNothing` forces a no-op conflict action even when the insert payload contains non-conflict columns.
+
+```go
+_, err := orm.Upsert(
+    ctx,
+    db,
+    auditEvent,
+    orm.ConflictColumns("tenant_id", "idempotency_key"),
+    orm.ConflictDoNothing(),
+)
+```
+
 ### `Table(...)`
 
 `Table` overrides the inferred table name for struct writes and is required for map writes.
@@ -554,6 +633,21 @@ activeDevelopers := orm.ComposeScopes(
     WithProfile(),
     BioLike("%developer%"),
 )
+```
+
+### `TenantScope(...)`
+
+`TenantScope` is a small reusable scope for the common `tenant_id = ?` predicate. Pass a custom column name when the table uses a different tenant boundary column.
+
+```go
+tenantDocs := orm.ComposeScopes(
+    orm.TenantScope(tenantID),
+    func(q *query.Query) *query.Query {
+        return q.WhereNull("archived_at")
+    },
+)
+
+scopeBindings := orm.TenantScope(tenantID, "scope_tenant_id")
 ```
 
 ### `SelectOneBy[T]` and `SelectAllBy[T]`
