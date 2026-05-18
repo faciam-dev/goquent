@@ -14,6 +14,7 @@ import "github.com/faciam-dev/goquent/orm"
 - [func DeleteBy\(ctx context.Context, base \*query.Query, scopes ...Scope\) \(sql.Result, error\)](<#DeleteBy>)
 - [func GetDriver\(name string\) \(sqldriver.Driver, bool\)](<#GetDriver>)
 - [func Insert\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Insert>)
+- [func InsertReturning\[T any, V any\]\(ctx context.Context, db \*DB, v V, opts ...WriteOpt\) \(T, error\)](<#InsertReturning>)
 - [func ManifestJSONSchema\(\) \(\[\]byte, error\)](<#ManifestJSONSchema>)
 - [func OperationSpecJSONSchema\(\) \(\[\]byte, error\)](<#OperationSpecJSONSchema>)
 - [func RegisterDialect\(name string, d driver.Dialect\)](<#RegisterDialect>)
@@ -30,7 +31,10 @@ import "github.com/faciam-dev/goquent/orm"
 - [func SelectStructs\[T any\]\(ctx context.Context, db \*DB, q string, args ...any\) \(\[\]T, error\)](<#SelectStructs>)
 - [func Update\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Update>)
 - [func UpdateBy\(ctx context.Context, base \*query.Query, data any, scopes ...Scope\) \(sql.Result, error\)](<#UpdateBy>)
+- [func UpdateByReturning\[T any\]\(ctx context.Context, db \*DB, base \*query.Query, data any, scopes ...Scope\) \(T, error\)](<#UpdateByReturning>)
+- [func UpdateReturning\[T any, V any\]\(ctx context.Context, db \*DB, v V, opts ...WriteOpt\) \(T, error\)](<#UpdateReturning>)
 - [func Upsert\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Upsert>)
+- [func UpsertReturning\[T any, V any\]\(ctx context.Context, db \*DB, v V, opts ...WriteOpt\) \(T, error\)](<#UpsertReturning>)
 - [func ValidateManifest\(m \*Manifest\) error](<#ValidateManifest>)
 - [type AnalysisPrecision](<#AnalysisPrecision>)
 - [type Approval](<#Approval>)
@@ -137,6 +141,9 @@ import "github.com/faciam-dev/goquent/orm"
   - [func ValidateOperationSpec\(spec OperationSpec, opts OperationOptions\) \(\[\]Warning, error\)](<#ValidateOperationSpec>)
 - [type WriteOpt](<#WriteOpt>)
   - [func Columns\(cols ...string\) WriteOpt](<#Columns>)
+  - [func ConflictColumns\(cols ...string\) WriteOpt](<#ConflictColumns>)
+  - [func ConflictConstraint\(name string\) WriteOpt](<#ConflictConstraint>)
+  - [func ConflictWhere\(predicate string\) WriteOpt](<#ConflictWhere>)
   - [func Omit\(cols ...string\) WriteOpt](<#Omit>)
   - [func PK\(cols ...string\) WriteOpt](<#PK>)
   - [func Returning\(cols ...string\) WriteOpt](<#Returning>)
@@ -322,6 +329,15 @@ func Insert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 
 Insert inserts v into its table.
 
+<a name="InsertReturning"></a>
+## func InsertReturning
+
+```go
+func InsertReturning[T any, V any](ctx context.Context, db *DB, v V, opts ...WriteOpt) (T, error)
+```
+
+InsertReturning inserts v and scans the Postgres RETURNING row into T.
+
 <a name="ManifestJSONSchema"></a>
 ## func ManifestJSONSchema
 
@@ -466,6 +482,24 @@ func UpdateBy(ctx context.Context, base *query.Query, data any, scopes ...Scope)
 
 UpdateBy applies scopes to base and executes an UPDATE using the resulting query.
 
+<a name="UpdateByReturning"></a>
+## func UpdateByReturning
+
+```go
+func UpdateByReturning[T any](ctx context.Context, db *DB, base *query.Query, data any, scopes ...Scope) (T, error)
+```
+
+UpdateByReturning applies scopes, executes an UPDATE, and scans the Postgres RETURNING row into T.
+
+<a name="UpdateReturning"></a>
+## func UpdateReturning
+
+```go
+func UpdateReturning[T any, V any](ctx context.Context, db *DB, v V, opts ...WriteOpt) (T, error)
+```
+
+UpdateReturning updates v and scans the Postgres RETURNING row into T.
+
 <a name="Upsert"></a>
 ## func Upsert
 
@@ -474,6 +508,15 @@ func Upsert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 ```
 
 Upsert inserts or updates v using primary keys.
+
+<a name="UpsertReturning"></a>
+## func UpsertReturning
+
+```go
+func UpsertReturning[T any, V any](ctx context.Context, db *DB, v V, opts ...WriteOpt) (T, error)
+```
+
+UpsertReturning upserts v and scans the Postgres RETURNING row into T.
 
 <a name="ValidateManifest"></a>
 ## func ValidateManifest
@@ -1455,6 +1498,33 @@ func Columns(cols ...string) WriteOpt
 ```
 
 Columns limits write to specified columns.
+
+<a name="ConflictColumns"></a>
+### func ConflictColumns
+
+```go
+func ConflictColumns(cols ...string) WriteOpt
+```
+
+ConflictColumns sets the conflict target columns for Upsert.
+
+<a name="ConflictConstraint"></a>
+### func ConflictConstraint
+
+```go
+func ConflictConstraint(name string) WriteOpt
+```
+
+ConflictConstraint sets a Postgres named constraint as the conflict target.
+
+<a name="ConflictWhere"></a>
+### func ConflictWhere
+
+```go
+func ConflictWhere(predicate string) WriteOpt
+```
+
+ConflictWhere adds a Postgres partial\-index predicate to the conflict target.
 
 <a name="Omit"></a>
 ### func Omit
