@@ -169,6 +169,34 @@ func TestUpdateByAppliesScopes(t *testing.T) {
 	}
 }
 
+func TestUpdateByReturningAppliesScopes(t *testing.T) {
+	ctx := context.Background()
+	db, mock := newReturningMockDB(t)
+
+	mock.ExpectQuery(`UPDATE "users" SET .* WHERE .* RETURNING "id", "name", "age"$`).
+		WithArgs("alice", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "age"}).AddRow(1, "alice", 34))
+
+	row, err := UpdateByReturning[genericWriteUser](
+		ctx,
+		db,
+		db.Table("users"),
+		map[string]any{"name": "alice"},
+		func(q *query.Query) *query.Query {
+			return q.Where("id", 1)
+		},
+	)
+	if err != nil {
+		t.Fatalf("update by returning: %v", err)
+	}
+	if row.ID != 1 || row.Name != "alice" || row.Age != 34 {
+		t.Fatalf("unexpected row: %+v", row)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
 func TestDeleteByAppliesScopes(t *testing.T) {
 	db, exec := newCaptureWriteDB(driver.MySQLDialect{})
 

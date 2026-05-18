@@ -7,6 +7,9 @@ The generic API is the small set of helpers around:
 - `Insert[T]`
 - `Update[T]`
 - `Upsert[T]`
+- `InsertReturning[T]`
+- `UpdateReturning[T]`
+- `UpsertReturning[T]`
 
 Use these helpers when you want a compact typed call and the operation is simple enough to fit their model. Use the query-builder API when you want to build SQL fluently with `db.Model(...).Where(...).Get(...)`, `db.Table(...).Where(...).FirstMap(...)`, joins, non-primary-key updates, or other builder features.
 
@@ -49,6 +52,7 @@ The write side of the generic API builds simple `INSERT`, `UPDATE`, and `UPSERT`
 _, err := orm.Insert(ctx, db, User{Name: "sam", Age: 18})
 _, err = orm.Update(ctx, db, User{ID: 1, Name: "sam"}, orm.Columns("name"), orm.WherePK())
 _, err = orm.Upsert(ctx, db, User{ID: 1, Name: "sam", Age: 18}, orm.WherePK())
+created, err := orm.InsertReturning[User](ctx, db, User{Name: "sam", Age: 18})
 ```
 
 For anything more complex than "write this row to this table", prefer
@@ -82,6 +86,7 @@ users, err := orm.SelectAllBy[User](
 )
 
 _, err = orm.UpdateBy(ctx, db.Table("users"), map[string]any{"age": 55}, WithProfile(), BioLike("%go%"))
+updated, err := orm.UpdateByReturning[User](ctx, db, db.Table("users"), map[string]any{"age": 55}, WithProfile(), BioLike("%go%"))
 _, err = orm.DeleteBy(ctx, db.Table("users"), WithProfile(), BioLike("%python%"))
 ```
 
@@ -160,6 +165,23 @@ For map destinations:
 - keys are the column names returned by the database,
 - values are stored as `any`,
 - `[]byte` values are converted to `string`.
+
+### Numeric columns
+
+Drivers do not all return SQL `numeric`/`decimal` values as the same Go type when scanning through `any`. PostgreSQL drivers commonly expose exact numeric values as text-like data. For portable DTOs, prefer one of these shapes:
+
+- Use `string` or `sql.NullString` in persistence rows when you need exact decimal text, then parse or round in your domain layer.
+- Use a custom type that implements `sql.Scanner` when the column has business-specific decimal semantics.
+- Use `float64` only when precision loss is acceptable and your driver returns a value convertible to `float64`.
+
+Example:
+
+```go
+type ScoreRow struct {
+    ID         string `db:"id"`
+    Confidence string `db:"confidence"` // numeric(4,3)
+}
+```
 
 ## Write API
 
@@ -243,11 +265,12 @@ _, err := orm.Update(
 
 ### `Upsert[T]`
 
-`Upsert` also requires `WherePK()`.
+`Upsert` requires either `WherePK()` or an explicit conflict target.
 
 - On MySQL it builds `INSERT ... ON DUPLICATE KEY UPDATE ...`.
 - On PostgreSQL it builds `INSERT ... ON CONFLICT (...) DO UPDATE ...`.
 - Primary-key columns used by `WherePK()` are always kept in the `INSERT` side of the statement, even if `Columns(...)`, `Omit(...)`, or `omitempty` would otherwise exclude them.
+- Columns named by `ConflictColumns(...)` are also kept in the `INSERT` side of the statement.
 
 If there are no non-primary-key columns left to update after filtering, the helper falls back to a no-op conflict action:
 
@@ -262,6 +285,65 @@ _, err := orm.Upsert(
     orm.WherePK(),
 )
 ```
+
+For a PostgreSQL partial unique index, pass the indexed columns plus the index predicate:
+
+```go
+_, err := orm.Upsert(
+    ctx,
+    db,
+    map[string]any{
+        "tenant_id":       tenantID,
+        "idempotency_key": key,
+        "payload_json":    payload,
+    },
+    orm.Table("ai_audit_logs"),
+    orm.ConflictColumns("tenant_id", "idempotency_key"),
+    orm.ConflictWhere("idempotency_key <> ''"),
+)
+```
+
+For a PostgreSQL named unique constraint, use `ConflictConstraint(...)`:
+
+```go
+_, err := orm.Upsert(
+    ctx,
+    db,
+    map[string]any{"email": email, "name": name},
+    orm.Table("users"),
+    orm.ConflictConstraint("users_email_key"),
+)
+```
+
+### Typed returning helpers
+
+`InsertReturning[T]`, `UpdateReturning[T]`, and `UpsertReturning[T]` execute the same generated write statements as `Insert`, `Update`, and `Upsert`, but scan the PostgreSQL `RETURNING` row into `T`.
+
+If you do not pass `Returning(...)`, goquent infers the returning column list from the destination struct tags.
+
+```go
+created, err := orm.InsertReturning[User](
+    ctx,
+    db,
+    User{Name: "sam", Age: 18, Active: true},
+)
+```
+
+For scoped updates, use `UpdateByReturning[T]`:
+
+```go
+updated, err := orm.UpdateByReturning[User](
+    ctx,
+    db,
+    db.Table("users"),
+    map[string]any{"active": true},
+    func(q *query.Query) *query.Query {
+        return q.Where("tenant_id", tenantID).Where("id", id)
+    },
+)
+```
+
+Map return values cannot infer a column list. For `InsertReturning`, `UpdateReturning`, and `UpsertReturning`, pass `Returning(...)` when the destination is `map[string]any`. `UpdateByReturning` currently infers columns from a struct destination.
 
 ## Write options
 
@@ -296,7 +378,7 @@ If you use both `Columns(...)` and `Omit(...)`, `Omit(...)` still removes the om
 
 ### `WherePK()`
 
-`WherePK()` is required for `Update` and `Upsert`.
+`WherePK()` is required for `Update`. `Upsert` can use `WherePK()` or an explicit conflict target.
 
 - Struct writes: use fields tagged with `db:"...,pk"`.
 - Map writes: use `PK(...)`.
@@ -321,7 +403,39 @@ _, err := orm.Update(
 )
 ```
 
-These helpers still return `sql.Result`. They do not expose returned row values directly.
+`Insert`, `Update`, and `Upsert` still return `sql.Result` when you use `Returning(...)`; they consume the returned rows to count affected rows. Use the typed returning helpers when you need row values.
+
+### `ConflictColumns(...)`
+
+`ConflictColumns` sets the `ON CONFLICT (...)` target for `Upsert`. It is useful for natural unique keys and PostgreSQL partial unique indexes.
+
+```go
+_, err := orm.Upsert(
+    ctx,
+    db,
+    map[string]any{"tenant_id": tenantID, "external_key": key, "payload_json": payload},
+    orm.Table("events"),
+    orm.ConflictColumns("tenant_id", "external_key"),
+)
+```
+
+### `ConflictWhere(...)`
+
+`ConflictWhere` appends a PostgreSQL partial-index predicate to the conflict target. The predicate is a raw SQL fragment and is validated to reject statement separators, comments, and write/DDL keywords.
+
+```go
+_, err := orm.Upsert(
+    ctx,
+    db,
+    event,
+    orm.ConflictColumns("tenant_id", "idempotency_key"),
+    orm.ConflictWhere("idempotency_key <> ''"),
+)
+```
+
+### `ConflictConstraint(...)`
+
+`ConflictConstraint` builds `ON CONFLICT ON CONSTRAINT ...` for PostgreSQL named unique constraints. It cannot be combined with `ConflictColumns(...)` or `ConflictWhere(...)`.
 
 ### `Table(...)`
 
@@ -485,14 +599,15 @@ _, err := orm.DeleteBy(ctx, db.Table("users"), WithProfile(), BioLike("%python%"
 
 - Reads only support struct destinations and `map[string]any`. Pointer destinations are not supported.
 - Writes only support non-pointer struct values and `map[string]any`.
-- Generic writes only support primary-key-based `Update` and `Upsert` through `WherePK()`. For arbitrary predicates, use the query-builder API.
+- Generic `Update` only supports primary-key-based updates through `WherePK()`. For arbitrary predicates, use `UpdateBy` or `UpdateByReturning`.
+- Generic `Upsert` can use `WherePK()`, `ConflictColumns(...)`, or `ConflictConstraint(...)`.
 - Scoped helpers are the recommended bridge when you want arbitrary predicates, joins, or `DELETE` while still keeping generic read/write helpers as the main public API.
 - Struct `Update` and `Upsert` depend on `db:"...,pk"` tags. Without them, `WherePK()` has no primary-key columns to use.
 - Since generic writes take struct values, a `TableName() string` override must be available on the value type. A pointer-receiver-only `TableName` method is not picked up here.
 - Map writes do not use struct metadata, so `readonly`, `omitempty`, and field tags do not apply.
 - Mapping is reflection-based. Unmatched columns are ignored, missing columns leave zero values, and scan or type-conversion failures are returned as errors.
 - There is no generic helper for `DELETE`.
-- `Returning(...)` changes the generated SQL for PostgreSQL, but the API does not scan returned rows back into a value.
+- Typed returning helpers are PostgreSQL-only because other supported dialects do not expose a compatible `RETURNING` clause here.
 
 ## Examples
 
@@ -535,6 +650,16 @@ if err != nil {
 }
 ```
 
+### Insert and return a struct
+
+```go
+created, err := orm.InsertReturning[User](ctx, db, User{Name: "sam", Age: 18, Active: true})
+if err != nil {
+    log.Fatal(err)
+}
+_ = created
+```
+
 ### Update selected columns on a struct
 
 ```go
@@ -548,6 +673,24 @@ _, err := orm.Update(
 if err != nil {
     log.Fatal(err)
 }
+```
+
+### Update by scope and return a struct
+
+```go
+updated, err := orm.UpdateByReturning[User](
+    ctx,
+    db,
+    db.Table("users"),
+    map[string]any{"active": true},
+    func(q *query.Query) *query.Query {
+        return q.Where("tenant_id", tenantID).Where("id", id)
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+_ = updated
 ```
 
 ### Update a map with `Table(...)`, `PK(...)`, and `WherePK()`

@@ -112,6 +112,35 @@ func getTypeMeta(t reflect.Type) (*typeMeta, error) {
 	return m, nil
 }
 
+func structColumnNames(t reflect.Type) ([]string, error) {
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("type %s is not struct", t)
+	}
+	cols := make([]string, 0, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
+		if sf.PkgPath != "" {
+			continue
+		}
+		tag := sf.Tag.Get("db")
+		if tag == "-" {
+			continue
+		}
+		col := ""
+		if tag != "" {
+			col = strings.Split(tag, ",")[0]
+		}
+		if col == "" {
+			col = stringutil.ToSnake(sf.Name)
+		}
+		cols = append(cols, col)
+	}
+	return cols, nil
+}
+
 // ResetMetaCache clears cached reflection metadata. Intended for tests.
 func ResetMetaCache() {
 	metaCache = sync.Map{}
