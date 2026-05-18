@@ -124,6 +124,7 @@ import "github.com/faciam-dev/goquent/orm"
 - [type Schema](<#Schema>)
 - [type Scope](<#Scope>)
   - [func ComposeScopes\(scopes ...Scope\) Scope](<#ComposeScopes>)
+  - [func TenantScope\(tenantID any, column ...string\) Scope](<#TenantScope>)
 - [type SourceLocation](<#SourceLocation>)
 - [type Suppression](<#Suppression>)
   - [func NewSuppression\(code, reason string, opts ...SuppressionOption\) \(Suppression, error\)](<#NewSuppression>)
@@ -143,11 +144,13 @@ import "github.com/faciam-dev/goquent/orm"
   - [func Columns\(cols ...string\) WriteOpt](<#Columns>)
   - [func ConflictColumns\(cols ...string\) WriteOpt](<#ConflictColumns>)
   - [func ConflictConstraint\(name string\) WriteOpt](<#ConflictConstraint>)
+  - [func ConflictDoNothing\(\) WriteOpt](<#ConflictDoNothing>)
   - [func ConflictWhere\(predicate string\) WriteOpt](<#ConflictWhere>)
   - [func Omit\(cols ...string\) WriteOpt](<#Omit>)
   - [func PK\(cols ...string\) WriteOpt](<#PK>)
   - [func Returning\(cols ...string\) WriteOpt](<#Returning>)
   - [func Table\(name string\) WriteOpt](<#Table>)
+  - [func UpdateColumns\(cols ...string\) WriteOpt](<#UpdateColumns>)
   - [func WherePK\(\) WriteOpt](<#WherePK>)
 
 
@@ -1343,6 +1346,15 @@ func ComposeScopes(scopes ...Scope) Scope
 
 ComposeScopes bundles scopes into a single reusable scope.
 
+<a name="TenantScope"></a>
+### func TenantScope
+
+```go
+func TenantScope(tenantID any, column ...string) Scope
+```
+
+TenantScope adds a tenant filter scope. The default column is tenant\_id.
+
 <a name="SourceLocation"></a>
 ## type SourceLocation
 
@@ -1517,6 +1529,15 @@ func ConflictConstraint(name string) WriteOpt
 
 ConflictConstraint sets a Postgres named constraint as the conflict target.
 
+<a name="ConflictDoNothing"></a>
+### func ConflictDoNothing
+
+```go
+func ConflictDoNothing() WriteOpt
+```
+
+ConflictDoNothing makes Upsert/UpsertReturning use a no\-op conflict action.
+
 <a name="ConflictWhere"></a>
 ### func ConflictWhere
 
@@ -1561,6 +1582,15 @@ func Table(name string) WriteOpt
 ```
 
 Table sets table name \(required for map writes\).
+
+<a name="UpdateColumns"></a>
+### func UpdateColumns
+
+```go
+func UpdateColumns(cols ...string) WriteOpt
+```
+
+UpdateColumns limits the conflict UPDATE side of Upsert/UpsertReturning. The insert side still uses Columns/Omit plus required conflict or primary\-key columns.
 
 <a name="WherePK"></a>
 ### func WherePK
@@ -2948,6 +2978,7 @@ import "github.com/faciam-dev/goquent/orm/query"
   - [func \(q \*Query\) OrWhereNotNull\(col string\) \*Query](<#Query.OrWhereNotNull>)
   - [func \(q \*Query\) OrWhereNull\(col string\) \*Query](<#Query.OrWhereNull>)
   - [func \(q \*Query\) OrWhereRaw\(raw string, vals map\[string\]any\) \*Query](<#Query.OrWhereRaw>)
+  - [func \(q \*Query\) OrWhereRawNoArgs\(raw string\) \*Query](<#Query.OrWhereRawNoArgs>)
   - [func \(q \*Query\) OrWhereTime\(col, cond, time string\) \*Query](<#Query.OrWhereTime>)
   - [func \(q \*Query\) OrWhereYear\(col, cond, year string\) \*Query](<#Query.OrWhereYear>)
   - [func \(q \*Query\) OrderBy\(col, dir string\) \*Query](<#Query.OrderBy>)
@@ -3002,6 +3033,7 @@ import "github.com/faciam-dev/goquent/orm/query"
   - [func \(q \*Query\) WhereNotNull\(col string\) \*Query](<#Query.WhereNotNull>)
   - [func \(q \*Query\) WhereNull\(col string\) \*Query](<#Query.WhereNull>)
   - [func \(q \*Query\) WhereRaw\(raw string, vals map\[string\]any\) \*Query](<#Query.WhereRaw>)
+  - [func \(q \*Query\) WhereRawNoArgs\(raw string\) \*Query](<#Query.WhereRawNoArgs>)
   - [func \(q \*Query\) WhereTime\(col, cond, time string\) \*Query](<#Query.WhereTime>)
   - [func \(q \*Query\) WhereYear\(col, cond, year string\) \*Query](<#Query.WhereYear>)
   - [func \(q \*Query\) WithContext\(ctx context.Context\) \*Query](<#Query.WithContext>)
@@ -3787,6 +3819,15 @@ func (q *Query) OrWhereRaw(raw string, vals map[string]any) *Query
 
 OrWhereRaw appends raw OR WHERE condition.
 
+<a name="Query.OrWhereRawNoArgs"></a>
+### func \(\*Query\) OrWhereRawNoArgs
+
+```go
+func (q *Query) OrWhereRawNoArgs(raw string) *Query
+```
+
+OrWhereRawNoArgs appends a raw OR WHERE condition that has no placeholders.
+
 <a name="Query.OrWhereTime"></a>
 ### func \(\*Query\) OrWhereTime
 
@@ -4272,6 +4313,15 @@ func (q *Query) WhereRaw(raw string, vals map[string]any) *Query
 ```
 
 WhereRaw appends raw WHERE condition.
+
+<a name="Query.WhereRawNoArgs"></a>
+### func \(\*Query\) WhereRawNoArgs
+
+```go
+func (q *Query) WhereRawNoArgs(raw string) *Query
+```
+
+WhereRawNoArgs appends a raw WHERE condition that has no placeholders.
 
 <a name="Query.WhereTime"></a>
 ### func \(\*Query\) WhereTime
