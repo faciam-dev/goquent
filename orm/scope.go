@@ -87,6 +87,34 @@ func UpdateBy(ctx context.Context, base *query.Query, data any, scopes ...Scope)
 	return q.WithContext(ctx).Update(data)
 }
 
+// UpdateByReturning applies scopes, executes an UPDATE, and scans the Postgres RETURNING row into T.
+func UpdateByReturning[T any](ctx context.Context, db *DB, base *query.Query, data any, scopes ...Scope) (T, error) {
+	var zero T
+	if db == nil {
+		return zero, fmt.Errorf("db is nil")
+	}
+	q, err := scopedQuery(base, scopes...)
+	if err != nil {
+		return zero, err
+	}
+	plan, err := q.PlanUpdate(ctx, data)
+	if err != nil {
+		return zero, err
+	}
+	if err := query.EnsurePlanExecutable(plan); err != nil {
+		return zero, err
+	}
+	cols, err := returningColumnsForQuery[T]()
+	if err != nil {
+		return zero, err
+	}
+	sqlStr, err := appendReturningClause(db.drv.Dialect, plan.SQL, cols)
+	if err != nil {
+		return zero, err
+	}
+	return queryReturningOne[T](ctx, db, sqlStr, plan.Params...)
+}
+
 // DeleteBy applies scopes to base and executes a DELETE using the resulting query.
 func DeleteBy(ctx context.Context, base *query.Query, scopes ...Scope) (sql.Result, error) {
 	q, err := scopedQuery(base, scopes...)

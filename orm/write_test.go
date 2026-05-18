@@ -198,6 +198,51 @@ func TestInsertReturningPostgresAddsClause(t *testing.T) {
 	}
 }
 
+func TestInsertReturningTypedInfersColumns(t *testing.T) {
+	db, mock := newReturningMockDB(t)
+	mock.ExpectQuery(`INSERT INTO "users".*RETURNING "id", "name", "age"$`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "age"}).AddRow(1, "alice", 30))
+
+	row, err := InsertReturning[genericWriteUser](
+		context.Background(),
+		db,
+		genericWriteUser{Name: "alice"},
+		Columns("name"),
+	)
+	if err != nil {
+		t.Fatalf("insert returning typed: %v", err)
+	}
+	if row.ID != 1 || row.Name != "alice" || row.Age != 30 {
+		t.Fatalf("unexpected row: %+v", row)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestInsertReturningMapUsesExplicitColumns(t *testing.T) {
+	db, mock := newReturningMockDB(t)
+	mock.ExpectQuery(`INSERT INTO "users".*RETURNING "id", "name"$`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(1, "alice"))
+
+	row, err := InsertReturning[map[string]any](
+		context.Background(),
+		db,
+		map[string]any{"name": "alice"},
+		Table("users"),
+		Returning("id", "name"),
+	)
+	if err != nil {
+		t.Fatalf("insert returning map: %v", err)
+	}
+	if row["id"] != int64(1) || row["name"] != "alice" {
+		t.Fatalf("unexpected row: %+v", row)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
 func TestUpdateReturningPostgresAddsClause(t *testing.T) {
 	db, mock := newReturningMockDB(t)
 	mock.ExpectQuery(`UPDATE "users" SET .* RETURNING "id", "name"$`).
@@ -216,6 +261,29 @@ func TestUpdateReturningPostgresAddsClause(t *testing.T) {
 	}
 	if aff, err := res.RowsAffected(); err != nil || aff != 1 {
 		t.Fatalf("expected rows affected 1, got %d err=%v", aff, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestUpdateReturningTypedInfersColumns(t *testing.T) {
+	db, mock := newReturningMockDB(t)
+	mock.ExpectQuery(`UPDATE "users" SET .* RETURNING "id", "name", "age"$`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "age"}).AddRow(3, "alice", 31))
+
+	row, err := UpdateReturning[genericWriteUser](
+		context.Background(),
+		db,
+		genericWriteUser{ID: 3, Name: "alice"},
+		Columns("name"),
+		WherePK(),
+	)
+	if err != nil {
+		t.Fatalf("update returning typed: %v", err)
+	}
+	if row.ID != 3 || row.Name != "alice" || row.Age != 31 {
+		t.Fatalf("unexpected row: %+v", row)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("expectations: %v", err)
@@ -242,5 +310,72 @@ func TestUpsertReturningPostgresAddsClause(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestUpsertReturningTypedInfersColumns(t *testing.T) {
+	db, mock := newReturningMockDB(t)
+	mock.ExpectQuery(`INSERT INTO "users".*ON CONFLICT \("id"\) DO UPDATE SET .* RETURNING "id", "name", "age"$`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "age"}).AddRow(5, "alice", 32))
+
+	row, err := UpsertReturning[genericWriteUser](
+		context.Background(),
+		db,
+		genericWriteUser{ID: 5, Name: "alice"},
+		WherePK(),
+	)
+	if err != nil {
+		t.Fatalf("upsert returning typed: %v", err)
+	}
+	if row.ID != 5 || row.Name != "alice" || row.Age != 32 {
+		t.Fatalf("unexpected row: %+v", row)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestUpsertPostgresConflictWhere(t *testing.T) {
+	db, exec := newCaptureWriteDB(driver.PostgresDialect{})
+
+	_, err := Upsert(
+		context.Background(),
+		db,
+		map[string]any{
+			"id":              "audit-1",
+			"tenant_id":       "tenant-1",
+			"idempotency_key": "idem-1",
+			"payload_json":    "{}",
+		},
+		Table("ai_audit_logs"),
+		ConflictColumns("tenant_id", "idempotency_key"),
+		ConflictWhere("idempotency_key <> ''"),
+	)
+	if err != nil {
+		t.Fatalf("upsert conflict where: %v", err)
+	}
+	if !strings.Contains(exec.query, `ON CONFLICT ("tenant_id", "idempotency_key") WHERE idempotency_key <> '' DO UPDATE SET`) {
+		t.Fatalf("expected partial-index conflict target, got: %s", exec.query)
+	}
+	if strings.Contains(exec.query, `"tenant_id"=EXCLUDED."tenant_id"`) || strings.Contains(exec.query, `"idempotency_key"=EXCLUDED."idempotency_key"`) {
+		t.Fatalf("conflict columns should not be updated: %s", exec.query)
+	}
+}
+
+func TestUpsertPostgresConflictConstraint(t *testing.T) {
+	db, exec := newCaptureWriteDB(driver.PostgresDialect{})
+
+	_, err := Upsert(
+		context.Background(),
+		db,
+		map[string]any{"name": "alice", "age": 30},
+		Table("users"),
+		ConflictConstraint("users_name_key"),
+	)
+	if err != nil {
+		t.Fatalf("upsert conflict constraint: %v", err)
+	}
+	if !strings.Contains(exec.query, `ON CONFLICT ON CONSTRAINT "users_name_key" DO UPDATE SET`) {
+		t.Fatalf("expected named constraint conflict target, got: %s", exec.query)
 	}
 }

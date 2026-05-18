@@ -15,7 +15,11 @@ func SelectOne[T any](ctx context.Context, db *DB, q string, args ...any) (T, er
 		return zero, err
 	}
 	defer rows.Close()
+	return scanRowsOne[T](db, rows)
+}
 
+func scanRowsOne[T any](db *DB, rows *sql.Rows) (T, error) {
+	var zero T
 	var t T
 	typ := reflect.TypeOf(t)
 	switch {
