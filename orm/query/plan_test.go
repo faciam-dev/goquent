@@ -202,3 +202,22 @@ func TestPlanParamsOrderingAndInjectionRegression(t *testing.T) {
 		t.Fatalf("placeholder count=%d sql=%q", got, plan.SQL)
 	}
 }
+
+func TestWhereRawNoArgsPlan(t *testing.T) {
+	plan, err := newPlanTestQuery(&recordingExec{}).
+		WhereRawNoArgs("deleted_at IS NULL").
+		Limit(1).
+		Plan(context.Background())
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	if !strings.Contains(plan.SQL, "deleted_at IS NULL") {
+		t.Fatalf("expected raw predicate in SQL, got %q", plan.SQL)
+	}
+	if len(plan.Params) != 0 {
+		t.Fatalf("expected no params, got %#v", plan.Params)
+	}
+	if len(plan.Predicates) != 1 || plan.Predicates[0].Raw != "deleted_at IS NULL" {
+		t.Fatalf("predicates=%#v", plan.Predicates)
+	}
+}

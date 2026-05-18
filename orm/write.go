@@ -24,6 +24,8 @@ type writeOptions struct {
 	conflictCols       []string
 	conflictWhere      string
 	conflictConstraint string
+	upsertUpdateCols   []string
+	hasUpsertUpdates   bool
 }
 
 // Columns limits write to specified columns.
@@ -69,6 +71,23 @@ func ConflictWhere(predicate string) WriteOpt {
 // ConflictConstraint sets a Postgres named constraint as the conflict target.
 func ConflictConstraint(name string) WriteOpt {
 	return func(o *writeOptions) { o.conflictConstraint = name }
+}
+
+// UpdateColumns limits the conflict UPDATE side of Upsert/UpsertReturning.
+// The insert side still uses Columns/Omit plus required conflict or primary-key columns.
+func UpdateColumns(cols ...string) WriteOpt {
+	return func(o *writeOptions) {
+		o.upsertUpdateCols = append([]string(nil), cols...)
+		o.hasUpsertUpdates = true
+	}
+}
+
+// ConflictDoNothing makes Upsert/UpsertReturning use a no-op conflict action.
+func ConflictDoNothing() WriteOpt {
+	return func(o *writeOptions) {
+		o.upsertUpdateCols = nil
+		o.hasUpsertUpdates = true
+	}
 }
 
 // Table sets table name (required for map writes).
@@ -622,7 +641,10 @@ func buildUpsertStatement(db *DB, v any, o *writeOptions) (string, []any, error)
 	}
 	sqlStr := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", quote(db.drv.Dialect, table), strings.Join(quotedCols, ", "), strings.Join(ph, ", "))
 	targetCols := conflictTargetColumns(o, pkCols)
-	updateCols := upsertUpdateColumns(cols, targetCols)
+	updateCols, err := upsertUpdateColumns(cols, targetCols, o)
+	if err != nil {
+		return "", nil, err
+	}
 	switch db.drv.Dialect.(type) {
 	case driver.MySQLDialect:
 		if strings.TrimSpace(o.conflictWhere) != "" || strings.TrimSpace(o.conflictConstraint) != "" {
@@ -654,7 +676,7 @@ func buildUpsertStatement(db *DB, v any, o *writeOptions) (string, []any, error)
 	default:
 		return "", nil, fmt.Errorf("upsert not supported on dialect: %T", db.drv.Dialect)
 	}
-	sqlStr, err := appendReturningClause(db.drv.Dialect, sqlStr, o.returning)
+	sqlStr, err = appendReturningClause(db.drv.Dialect, sqlStr, o.returning)
 	if err != nil {
 		return "", nil, err
 	}
@@ -668,7 +690,14 @@ func conflictTargetColumns(o *writeOptions, pkCols []string) []string {
 	return append([]string(nil), pkCols...)
 }
 
-func upsertUpdateColumns(cols []string, targetCols []string) []string {
+func upsertUpdateColumns(cols []string, targetCols []string, o *writeOptions) ([]string, error) {
+	if o.hasUpsertUpdates {
+		updateCols := dedupeColumns(o.upsertUpdateCols)
+		if err := ensureUpsertUpdateColumnsPresent(updateCols, cols); err != nil {
+			return nil, err
+		}
+		return updateCols, nil
+	}
 	target := make(map[string]struct{}, len(targetCols))
 	for _, col := range targetCols {
 		target[col] = struct{}{}
@@ -680,7 +709,24 @@ func upsertUpdateColumns(cols []string, targetCols []string) []string {
 		}
 		updateCols = append(updateCols, col)
 	}
-	return updateCols
+	return updateCols, nil
+}
+
+func dedupeColumns(cols []string) []string {
+	seen := make(map[string]struct{}, len(cols))
+	out := make([]string, 0, len(cols))
+	for _, col := range cols {
+		key := strings.TrimSpace(col)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, key)
+	}
+	return out
 }
 
 func ensureConflictColumnsPresent(targetCols []string, cols []string) error {
@@ -694,6 +740,22 @@ func ensureConflictColumnsPresent(targetCols []string, cols []string) error {
 	for _, col := range targetCols {
 		if _, ok := present[col]; !ok {
 			return fmt.Errorf("ConflictColumns requires column %s", col)
+		}
+	}
+	return nil
+}
+
+func ensureUpsertUpdateColumnsPresent(updateCols []string, insertCols []string) error {
+	if len(updateCols) == 0 {
+		return nil
+	}
+	present := make(map[string]struct{}, len(insertCols))
+	for _, col := range insertCols {
+		present[col] = struct{}{}
+	}
+	for _, col := range updateCols {
+		if _, ok := present[col]; !ok {
+			return fmt.Errorf("UpdateColumns requires inserted column %s", col)
 		}
 	}
 	return nil
