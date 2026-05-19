@@ -12,6 +12,15 @@ import (
 // Scope applies reusable query mutations for advanced read and write flows.
 type Scope func(*query.Query) *query.Query
 
+// CursorColumn describes an ordered column used by keyset cursor scopes.
+type CursorColumn = query.CursorColumn
+
+// CursorAsc returns an ascending keyset cursor column.
+func CursorAsc(name string) CursorColumn { return query.CursorAsc(name) }
+
+// CursorDesc returns a descending keyset cursor column.
+func CursorDesc(name string) CursorColumn { return query.CursorDesc(name) }
+
 // ApplyScopes applies scopes to q in order. Nil scopes are ignored.
 // If a scope returns nil, the current query is kept.
 func ApplyScopes(q *query.Query, scopes ...Scope) *query.Query {
@@ -43,6 +52,20 @@ func TenantScope(tenantID any, column ...string) Scope {
 	}
 	return func(q *query.Query) *query.Query {
 		return q.Where(col, tenantID)
+	}
+}
+
+// CursorAfter adds a keyset pagination predicate after the given cursor.
+func CursorAfter(columns []CursorColumn, values ...any) Scope {
+	return func(q *query.Query) *query.Query {
+		return q.WhereCursorAfter(columns, values...)
+	}
+}
+
+// CursorBefore adds a keyset pagination predicate before the given cursor.
+func CursorBefore(columns []CursorColumn, values ...any) Scope {
+	return func(q *query.Query) *query.Query {
+		return q.WhereCursorBefore(columns, values...)
 	}
 }
 

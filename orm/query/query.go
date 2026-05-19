@@ -51,6 +51,22 @@ type Query struct {
 	policyApplied bool
 }
 
+// CursorColumn describes an ordered column used by keyset cursor predicates.
+type CursorColumn struct {
+	Name      string
+	Direction string
+}
+
+// CursorAsc returns an ascending keyset cursor column.
+func CursorAsc(name string) CursorColumn {
+	return CursorColumn{Name: name, Direction: "asc"}
+}
+
+// CursorDesc returns a descending keyset cursor column.
+func CursorDesc(name string) CursorColumn {
+	return CursorColumn{Name: name, Direction: "desc"}
+}
+
 // New creates a Query with given db and table.
 func New(exec executor, table string, dialect driver.Dialect) *Query {
 	builder := newSelectBuilder(dialect)
@@ -238,8 +254,17 @@ func (q *Query) execStmt(sqlStr string, args ...any) (sql.Result, error) {
 	return q.exec.Exec(sqlStr, args...)
 }
 
-// Select sets selected columns.
+// Select sets selected identifier columns. Use SelectRaw for SQL expressions.
 func (q *Query) Select(cols ...string) *Query {
+	if q.err != nil {
+		return q
+	}
+	for _, col := range cols {
+		if err := validateSelectColumn(col); err != nil {
+			q.err = err
+			return q
+		}
+	}
 	q.builder.Select(cols...)
 	return q
 }
@@ -270,6 +295,48 @@ func (q *Query) Where(col string, args ...any) *Query {
 		q.err = fmt.Errorf("invalid Where usage")
 	}
 	return q
+}
+
+// WhereCursorAfter adds a keyset pagination predicate after the given cursor.
+func (q *Query) WhereCursorAfter(columns []CursorColumn, values ...any) *Query {
+	return q.whereCursor(columns, values, true)
+}
+
+// WhereCursorBefore adds a keyset pagination predicate before the given cursor.
+func (q *Query) WhereCursorBefore(columns []CursorColumn, values ...any) *Query {
+	return q.whereCursor(columns, values, false)
+}
+
+func (q *Query) whereCursor(columns []CursorColumn, values []any, after bool) *Query {
+	if q.err != nil {
+		return q
+	}
+	normalized, err := validateCursorColumns(columns, values)
+	if err != nil {
+		q.err = err
+		return q
+	}
+	raw, vals := q.cursorPredicate(normalized, values, after)
+	q.builder.WhereRaw(raw, vals)
+	return q
+}
+
+func (q *Query) cursorPredicate(columns []CursorColumn, values []any, after bool) (string, map[string]any) {
+	vals := make(map[string]any)
+	parts := make([]string, 0, len(columns))
+	for i := range columns {
+		comparisons := make([]string, 0, i+1)
+		for j := 0; j < i; j++ {
+			name := fmt.Sprintf("__goquent_cursor_%d_%d", i, j)
+			vals[name] = values[j]
+			comparisons = append(comparisons, fmt.Sprintf("%s = :%s", quoteIdentifierPath(q.dialect, columns[j].Name), name))
+		}
+		name := fmt.Sprintf("__goquent_cursor_%d_%d", i, i)
+		vals[name] = values[i]
+		comparisons = append(comparisons, fmt.Sprintf("%s %s :%s", quoteIdentifierPath(q.dialect, columns[i].Name), cursorComparisonOperator(columns[i].Direction, after), name))
+		parts = append(parts, "("+strings.Join(comparisons, " AND ")+")")
+	}
+	return "(" + strings.Join(parts, " OR ") + ")", vals
 }
 
 // First scans the first result into dest struct.
@@ -1819,6 +1886,105 @@ func validateRawSQLFragment(raw string) error {
 		}
 	}
 	return nil
+}
+
+func validateSelectColumn(col string) error {
+	trimmed := strings.TrimSpace(col)
+	if trimmed == "" {
+		return fmt.Errorf("goquent: Select column name is required")
+	}
+	if trimmed != col || selectFieldLooksLikeSQLExpression(trimmed) {
+		return fmt.Errorf("goquent: Select received a SQL expression-like field %q; use SelectRaw(...) for SQL expressions", col)
+	}
+	return nil
+}
+
+func validateCursorColumns(columns []CursorColumn, values []any) ([]CursorColumn, error) {
+	if len(columns) == 0 {
+		return nil, fmt.Errorf("goquent: cursor columns are required")
+	}
+	if len(columns) != len(values) {
+		return nil, fmt.Errorf("goquent: cursor column/value count mismatch")
+	}
+	normalized := make([]CursorColumn, len(columns))
+	for i, col := range columns {
+		name := strings.TrimSpace(col.Name)
+		if name == "" {
+			return nil, fmt.Errorf("goquent: cursor column name is required")
+		}
+		if strings.Contains(name, "*") {
+			return nil, fmt.Errorf("goquent: cursor column %q cannot be a wildcard", col.Name)
+		}
+		if err := validateSelectColumn(name); err != nil {
+			return nil, fmt.Errorf("goquent: invalid cursor column %q: %w", col.Name, err)
+		}
+		dir, err := validateOrderDirection(col.Direction)
+		if err != nil {
+			return nil, err
+		}
+		if values[i] == nil {
+			return nil, fmt.Errorf("goquent: cursor value for %s is nil", name)
+		}
+		normalized[i] = CursorColumn{Name: name, Direction: dir}
+	}
+	return normalized, nil
+}
+
+func cursorComparisonOperator(direction string, after bool) string {
+	desc := strings.EqualFold(direction, "desc")
+	if after {
+		if desc {
+			return "<"
+		}
+		return ">"
+	}
+	if desc {
+		return ">"
+	}
+	return "<"
+}
+
+func quoteIdentifierPath(d driver.Dialect, ident string) string {
+	parts := strings.Split(ident, ".")
+	for i, part := range parts {
+		parts[i] = d.QuoteIdent(part)
+	}
+	return strings.Join(parts, ".")
+}
+
+func selectFieldLooksLikeSQLExpression(field string) bool {
+	if strings.ContainsAny(field, " \t\r\n\v\f()[],;'\"`\x00") ||
+		strings.Contains(field, "::") ||
+		strings.Contains(field, "--") ||
+		strings.Contains(field, "/*") ||
+		strings.Contains(field, "*/") {
+		return true
+	}
+	if selectFieldHasInvalidWildcard(field) {
+		return true
+	}
+	for _, op := range []string{"->", "->>", "+", "-", "/", "%", "=", "<", ">", "||", "&"} {
+		if strings.Contains(field, op) {
+			return true
+		}
+	}
+	upper := strings.ToUpper(field)
+	for _, token := range []string{"AS", "CASE"} {
+		if containsSQLWord(upper, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func selectFieldHasInvalidWildcard(field string) bool {
+	if !strings.Contains(field, "*") {
+		return false
+	}
+	if field == "*" {
+		return false
+	}
+	return !(strings.HasSuffix(field, ".*") && strings.Count(field, "*") == 1)
 }
 
 func validateColumnComparisons(columns [][]string) error {

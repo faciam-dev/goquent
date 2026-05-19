@@ -422,6 +422,82 @@ func TestUpsertConflictDoNothing(t *testing.T) {
 	}
 }
 
+func TestUpsertPostgresConflictTargetRaw(t *testing.T) {
+	db, exec := newCaptureWriteDB(driver.PostgresDialect{})
+
+	_, err := Upsert(
+		context.Background(),
+		db,
+		map[string]any{
+			"tenant_id":      "tenant-1",
+			"target_node_id": nil,
+			"payload_json":   "{}",
+		},
+		Table("citation_links"),
+		ConflictTargetRaw(`("tenant_id", COALESCE("target_node_id", '')) WHERE "active"`),
+		ConflictDoNothing(),
+	)
+	if err != nil {
+		t.Fatalf("upsert raw conflict target: %v", err)
+	}
+	if !strings.Contains(exec.query, `ON CONFLICT ("tenant_id", COALESCE("target_node_id", '')) WHERE "active" DO NOTHING`) {
+		t.Fatalf("expected raw expression conflict target, got: %s", exec.query)
+	}
+}
+
+func TestInsertOnceReturningInsertedRow(t *testing.T) {
+	db, mock := newReturningMockDB(t)
+	mock.ExpectQuery(`INSERT INTO "users".*ON CONFLICT \("id"\) DO NOTHING RETURNING "id", "name", "age"$`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "age"}).AddRow(5, "alice", 32))
+
+	row, inserted, err := InsertOnceReturning[genericWriteUser](
+		context.Background(),
+		db,
+		genericWriteUser{ID: 5, Name: "alice", Age: 32},
+		WherePK(),
+	)
+	if err != nil {
+		t.Fatalf("insert once returning: %v", err)
+	}
+	if !inserted {
+		t.Fatal("expected inserted=true")
+	}
+	if row.ID != 5 || row.Name != "alice" || row.Age != 32 {
+		t.Fatalf("unexpected row: %+v", row)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestInsertOnceReturningExistingRow(t *testing.T) {
+	db, mock := newReturningMockDB(t)
+	mock.ExpectQuery(`INSERT INTO "users".*ON CONFLICT \("id"\) DO NOTHING RETURNING "id", "name", "age"$`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "age"}))
+	mock.ExpectQuery(`SELECT "id", "name", "age" FROM "users" WHERE "id" = \$1`).
+		WithArgs(int64(5)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "age"}).AddRow(5, "existing", 40))
+
+	row, inserted, err := InsertOnceReturning[genericWriteUser](
+		context.Background(),
+		db,
+		genericWriteUser{ID: 5, Name: "alice", Age: 32},
+		WherePK(),
+	)
+	if err != nil {
+		t.Fatalf("insert once returning existing: %v", err)
+	}
+	if inserted {
+		t.Fatal("expected inserted=false")
+	}
+	if row.ID != 5 || row.Name != "existing" || row.Age != 40 {
+		t.Fatalf("unexpected row: %+v", row)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
 func TestUpsertUpdateColumnsRequireInsertedColumn(t *testing.T) {
 	db, _ := newCaptureWriteDB(driver.PostgresDialect{})
 
