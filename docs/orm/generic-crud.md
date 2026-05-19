@@ -362,6 +362,26 @@ _, err := orm.Upsert(
 )
 ```
 
+For PostgreSQL expression indexes, use `ConflictTargetRaw(...)`. This is an
+explicit raw escape hatch for the conflict target only; prefer
+`ConflictColumns(...)`, `ConflictWhere(...)`, or `ConflictConstraint(...)`
+when they can express the index.
+
+```go
+_, err := orm.Upsert(
+    ctx,
+    db,
+    map[string]any{
+        "tenant_id":      tenantID,
+        "target_node_id": targetNodeID,
+        "payload_json":   payload,
+    },
+    orm.Table("citation_links"),
+    orm.ConflictTargetRaw(`("tenant_id", COALESCE("target_node_id", '')) WHERE "active"`),
+    orm.ConflictDoNothing(),
+)
+```
+
 ### Typed returning helpers
 
 `InsertReturning[T]`, `UpdateReturning[T]`, and `UpsertReturning[T]` execute the same generated write statements as `Insert`, `Update`, and `Upsert`, but scan the PostgreSQL `RETURNING` row into `T`.
@@ -391,6 +411,33 @@ updated, err := orm.UpdateByReturning[User](
 ```
 
 Map return values cannot infer a column list. For `InsertReturning`, `UpdateReturning`, and `UpsertReturning`, pass `Returning(...)` when the destination is `map[string]any`. `UpdateByReturning` currently infers columns from a struct destination.
+
+### Insert-once returning
+
+`InsertOnceReturning[T]` is for append-only/idempotency tables. It attempts
+`ON CONFLICT DO NOTHING RETURNING ...`. If the row was inserted, the second
+return value is `true`. If the conflict path returns no row, goquent looks up
+the existing row by `ConflictColumns(...)` or `WherePK()`.
+
+```go
+attempt, inserted, err := orm.InsertOnceReturning[SubmissionAttemptRow](
+    ctx,
+    db,
+    map[string]any{
+        "tenant_id":       tenantID,
+        "idempotency_key": key,
+        "payload_json":    payload,
+    },
+    orm.Table("submission_attempts"),
+    orm.ConflictColumns("tenant_id", "idempotency_key"),
+    orm.Returning("id", "tenant_id", "idempotency_key", "payload_json"),
+)
+_ = inserted
+_ = attempt
+```
+
+For expression-only raw conflict targets, also provide `ConflictColumns(...)`
+or `WherePK()` when you need the existing-row lookup.
 
 ## Write options
 
@@ -483,6 +530,24 @@ _, err := orm.Upsert(
 ### `ConflictConstraint(...)`
 
 `ConflictConstraint` builds `ON CONFLICT ON CONSTRAINT ...` for PostgreSQL named unique constraints. It cannot be combined with `ConflictColumns(...)` or `ConflictWhere(...)`.
+
+### `ConflictTargetRaw(...)`
+
+`ConflictTargetRaw` supplies the PostgreSQL `ON CONFLICT` target literally. Use
+it for expression indexes that cannot be represented as plain columns.
+
+```go
+_, err := orm.Upsert(
+    ctx,
+    db,
+    row,
+    orm.ConflictTargetRaw(`("tenant_id", lower("external_key")) WHERE "active"`),
+    orm.ConflictDoNothing(),
+)
+```
+
+It cannot be combined with `ConflictColumns(...)`, `ConflictWhere(...)`, or
+`ConflictConstraint(...)`.
 
 ### `UpdateColumns(...)`
 
@@ -598,6 +663,34 @@ if err := tx.Commit(); err != nil {
 
 The same pattern works with `db.Begin()`.
 
+## JSON, nullable values, and projections
+
+Use `JSONField[T]` in persistence rows for JSON/JSONB columns when you want
+typed scan and value behavior at the repository edge.
+
+```go
+type ValidationSummary struct {
+    Status string `json:"status"`
+}
+
+type FilingRow struct {
+    ID                string                           `db:"id"`
+    ValidationSummary orm.JSONField[ValidationSummary] `db:"validation_summary"`
+}
+
+summary := row.ValidationSummary.OrDefault(ValidationSummary{Status: "unknown"})
+```
+
+For insert/update maps, `JSONOf(value)` stores typed JSON and `JSONNull[T]()`
+stores SQL NULL. `NullString`, `NullStringPtr`, and `NullStringEmpty` are small
+helpers for optional string/UUID fields represented as `sql.NullString`.
+
+Wide read projections should use explicit select aliases and dedicated row
+structs. For nested JSON aggregate snapshots, keep the raw SQL in a small
+repository method, require raw approval, and scan into a typed row containing
+`JSONField[T]` fields. That preserves the SQL review boundary without forcing
+nested aggregate SQL into the structured builder.
+
 ## Scope-Based Advanced Path
 
 `Scope` lets you keep reusable query fragments near the generic helpers instead of dropping straight to ad-hoc builder code everywhere.
@@ -650,6 +743,33 @@ tenantDocs := orm.ComposeScopes(
 scopeBindings := orm.TenantScope(tenantID, "scope_tenant_id")
 ```
 
+### `CursorAfter(...)` and `CursorBefore(...)`
+
+Cursor scopes add keyset pagination predicates without hand-written raw SQL.
+The helper expands ordered columns into a lexicographic predicate, so mixed
+ascending and descending cursor columns remain explicit.
+
+```go
+rows, err := orm.SelectAllBy[WorkQueueRow](
+    ctx,
+    db,
+    db.Table("filing_cases").
+        Select("id", "due_at", "title").
+        OrderBy("due_at", "desc").
+        OrderBy("id", "desc").
+        Limit(50),
+    orm.TenantScope(tenantID),
+    orm.CursorAfter(
+        []orm.CursorColumn{
+            orm.CursorDesc("due_at"),
+            orm.CursorDesc("id"),
+        },
+        cursorDueAt,
+        cursorID,
+    ),
+)
+```
+
 ### `SelectOneBy[T]` and `SelectAllBy[T]`
 
 These helpers build SQL from a scoped query and still scan through the generic read path.
@@ -694,7 +814,7 @@ _, err := orm.DeleteBy(ctx, db.Table("users"), WithProfile(), BioLike("%python%"
 - Reads only support struct destinations and `map[string]any`. Pointer destinations are not supported.
 - Writes only support non-pointer struct values and `map[string]any`.
 - Generic `Update` only supports primary-key-based updates through `WherePK()`. For arbitrary predicates, use `UpdateBy` or `UpdateByReturning`.
-- Generic `Upsert` can use `WherePK()`, `ConflictColumns(...)`, or `ConflictConstraint(...)`.
+- Generic `Upsert` can use `WherePK()`, `ConflictColumns(...)`, `ConflictConstraint(...)`, or `ConflictTargetRaw(...)`.
 - Scoped helpers are the recommended bridge when you want arbitrary predicates, joins, or `DELETE` while still keeping generic read/write helpers as the main public API.
 - Struct `Update` and `Upsert` depend on `db:"...,pk"` tags. Without them, `WherePK()` has no primary-key columns to use.
 - Since generic writes take struct values, a `TableName() string` override must be available on the value type. A pointer-receiver-only `TableName` method is not picked up here.

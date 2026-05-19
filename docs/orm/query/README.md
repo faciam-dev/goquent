@@ -757,7 +757,7 @@ SafeWhereRaw appends a raw WHERE condition ensuring a values map is always used.
 func (q *Query) Select(cols ...string) *Query
 ```
 
-Select sets selected columns.
+Select sets selected identifier columns. Use SelectRaw for SQL expressions.
 
 <a name="Query.SelectRaw"></a>
 ### func \(\*Query\) [SelectRaw](<https://github.com/faciam-dev/goquent/blob/main/orm/query/query.go#L257>)

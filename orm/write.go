@@ -3,12 +3,15 @@ package orm
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/faciam-dev/goquent/orm/driver"
 	"github.com/faciam-dev/goquent/orm/model"
+	"github.com/faciam-dev/goquent/orm/query"
 )
 
 // WriteOpt configures write behavior.
@@ -24,6 +27,7 @@ type writeOptions struct {
 	conflictCols       []string
 	conflictWhere      string
 	conflictConstraint string
+	conflictTargetRaw  string
 	upsertUpdateCols   []string
 	hasUpsertUpdates   bool
 }
@@ -71,6 +75,18 @@ func ConflictWhere(predicate string) WriteOpt {
 // ConflictConstraint sets a Postgres named constraint as the conflict target.
 func ConflictConstraint(name string) WriteOpt {
 	return func(o *writeOptions) { o.conflictConstraint = name }
+}
+
+// ConflictTargetRaw sets a raw Postgres ON CONFLICT target.
+//
+// Use this for expression indexes such as:
+//
+//	ConflictTargetRaw(`("tenant_id", COALESCE("target_node_id", '')) WHERE "active"`)
+//
+// Prefer ConflictColumns, ConflictWhere, or ConflictConstraint when they can
+// express the target.
+func ConflictTargetRaw(target string) WriteOpt {
+	return func(o *writeOptions) { o.conflictTargetRaw = target }
 }
 
 // UpdateColumns limits the conflict UPDATE side of Upsert/UpsertReturning.
@@ -122,7 +138,9 @@ func (o *writeOptions) isPK(col string) bool {
 }
 
 func (o *writeOptions) hasConflictTarget() bool {
-	return len(o.conflictCols) > 0 || strings.TrimSpace(o.conflictConstraint) != ""
+	return len(o.conflictCols) > 0 ||
+		strings.TrimSpace(o.conflictConstraint) != "" ||
+		strings.TrimSpace(o.conflictTargetRaw) != ""
 }
 
 func (o *writeOptions) isConflictColumn(col string) bool {
@@ -529,6 +547,40 @@ func UpsertReturning[T any, V any](ctx context.Context, db *DB, v V, opts ...Wri
 	return queryReturningOne[T](ctx, db, sqlStr, args...)
 }
 
+// InsertOnceReturning inserts v once and scans the inserted or existing row.
+//
+// It uses ON CONFLICT DO NOTHING RETURNING for the insert attempt. If the
+// conflict path returns no row, it looks up the existing row by ConflictColumns
+// or WherePK primary-key columns. Expression-only raw conflict targets need
+// ConflictColumns or WherePK as a lookup key.
+func InsertOnceReturning[T any, V any](ctx context.Context, db *DB, v V, opts ...WriteOpt) (T, bool, error) {
+	var zero T
+	o := applyWriteOpts(opts)
+	if err := ensureReturningColumns[T](o); err != nil {
+		return zero, false, err
+	}
+	o.upsertUpdateCols = nil
+	o.hasUpsertUpdates = true
+
+	sqlStr, args, err := buildUpsertStatement(db, v, o)
+	if err != nil {
+		return zero, false, err
+	}
+	inserted, err := queryReturningOne[T](ctx, db, sqlStr, args...)
+	if err == nil {
+		return inserted, true, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return zero, false, err
+	}
+
+	existing, err := selectExistingInsertOnceRow[T](ctx, db, v, o)
+	if err != nil {
+		return zero, false, err
+	}
+	return existing, false, nil
+}
+
 func buildUpsertStatement(db *DB, v any, o *writeOptions) (string, []any, error) {
 	if !o.wherePK && !o.hasConflictTarget() {
 		return "", nil, fmt.Errorf("Upsert[T] requires WherePK, ConflictColumns, or ConflictConstraint")
@@ -647,8 +699,8 @@ func buildUpsertStatement(db *DB, v any, o *writeOptions) (string, []any, error)
 	}
 	switch db.drv.Dialect.(type) {
 	case driver.MySQLDialect:
-		if strings.TrimSpace(o.conflictWhere) != "" || strings.TrimSpace(o.conflictConstraint) != "" {
-			return "", nil, fmt.Errorf("ConflictWhere and ConflictConstraint are not supported on dialect: %T", db.drv.Dialect)
+		if strings.TrimSpace(o.conflictWhere) != "" || strings.TrimSpace(o.conflictConstraint) != "" || strings.TrimSpace(o.conflictTargetRaw) != "" {
+			return "", nil, fmt.Errorf("ConflictWhere, ConflictConstraint, and ConflictTargetRaw are not supported on dialect: %T", db.drv.Dialect)
 		}
 		if len(updateCols) > 0 {
 			assigns := make([]string, len(updateCols))
@@ -681,6 +733,85 @@ func buildUpsertStatement(db *DB, v any, o *writeOptions) (string, []any, error)
 		return "", nil, err
 	}
 	return sqlStr, args, nil
+}
+
+func selectExistingInsertOnceRow[T any](ctx context.Context, db *DB, v any, o *writeOptions) (T, error) {
+	var zero T
+	table, values, pkCols, err := writeLookupValues(v, o)
+	if err != nil {
+		return zero, err
+	}
+	lookupCols := dedupeColumns(o.conflictCols)
+	if len(lookupCols) == 0 {
+		lookupCols = pkCols
+	}
+	if len(lookupCols) == 0 {
+		return zero, fmt.Errorf("InsertOnceReturning existing-row lookup requires ConflictColumns or WherePK primary key columns")
+	}
+
+	q := db.Table(table).Select(o.returning...)
+	for _, col := range lookupCols {
+		value, ok := values[col]
+		if !ok {
+			return zero, fmt.Errorf("InsertOnceReturning lookup requires column %s", col)
+		}
+		q.Where(col, value)
+	}
+	if predicate := strings.TrimSpace(o.conflictWhere); predicate != "" {
+		q.WhereRawNoArgs(predicate)
+	}
+	plan, err := q.Plan(ctx)
+	if err != nil {
+		return zero, err
+	}
+	if err := query.EnsurePlanExecutable(plan); err != nil {
+		return zero, err
+	}
+	return SelectOne[T](ctx, db.RequireRawApproval("goquent generated insert-once lookup"), plan.SQL, plan.Params...)
+}
+
+func writeLookupValues(v any, o *writeOptions) (string, map[string]any, []string, error) {
+	val := reflect.ValueOf(v)
+	typ := val.Type()
+	values := make(map[string]any)
+	var table string
+	var pkCols []string
+
+	if isMapStringInterface(typ) {
+		if o.table == "" {
+			return "", nil, nil, fmt.Errorf("Table option required for map writes")
+		}
+		table = o.table
+		iter := val.MapRange()
+		for iter.Next() {
+			values[iter.Key().String()] = iter.Value().Interface()
+		}
+		if o.wherePK {
+			for col := range o.pkCols {
+				pkCols = append(pkCols, col)
+			}
+			sort.Strings(pkCols)
+		}
+		return table, values, pkCols, nil
+	}
+
+	if typ.Kind() != reflect.Struct {
+		return "", nil, nil, fmt.Errorf("unsupported type %s", typ)
+	}
+	table = o.table
+	if table == "" {
+		table = model.TableName(v)
+	}
+	meta, err := getTypeMeta(typ)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	for _, fm := range meta.FieldsByName {
+		fv := val.FieldByIndex(fm.IndexPath)
+		values[fm.Col] = fv.Interface()
+	}
+	pkCols = append(pkCols, meta.PKCols...)
+	return table, values, pkCols, nil
 }
 
 func conflictTargetColumns(o *writeOptions, pkCols []string) []string {
@@ -762,8 +893,24 @@ func ensureUpsertUpdateColumnsPresent(updateCols []string, insertCols []string) 
 }
 
 func postgresConflictTarget(d driver.Dialect, cols []string, o *writeOptions) (string, error) {
+	rawTarget := strings.TrimSpace(o.conflictTargetRaw)
 	constraint := strings.TrimSpace(o.conflictConstraint)
 	predicate := strings.TrimSpace(o.conflictWhere)
+	if rawTarget != "" {
+		if len(o.conflictCols) > 0 {
+			return "", fmt.Errorf("ConflictTargetRaw cannot be combined with ConflictColumns")
+		}
+		if constraint != "" {
+			return "", fmt.Errorf("ConflictTargetRaw cannot be combined with ConflictConstraint")
+		}
+		if predicate != "" {
+			return "", fmt.Errorf("ConflictTargetRaw cannot be combined with ConflictWhere")
+		}
+		if err := validateWriteRawSQLFragment(rawTarget); err != nil {
+			return "", err
+		}
+		return rawTarget, nil
+	}
 	if constraint != "" {
 		if len(o.conflictCols) > 0 {
 			return "", fmt.Errorf("ConflictConstraint cannot be combined with ConflictColumns")

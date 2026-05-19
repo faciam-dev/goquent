@@ -87,6 +87,86 @@ func TestSelectPlanSnapshot(t *testing.T) {
 	}
 }
 
+func TestSelectRejectsExpressionLikeFields(t *testing.T) {
+	cases := []string{
+		"CASE WHEN result IS NULL THEN NULL ELSE result::text END AS result_json",
+		"COUNT(id)",
+		"result::text",
+		"name AS display_name",
+		"result->>'status'",
+		"first name",
+	}
+
+	for _, field := range cases {
+		t.Run(field, func(t *testing.T) {
+			_, err := newPlanTestQuery(&recordingExec{}).
+				Select("finished_at", field).
+				Plan(context.Background())
+			if err == nil {
+				t.Fatal("expected Select expression-like field error")
+			}
+			if !strings.Contains(err.Error(), "SelectRaw(...)") || !strings.Contains(err.Error(), field) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestSelectRawAcceptsExpressionSelection(t *testing.T) {
+	exec := &recordingExec{}
+	plan, err := newPlanTestQuery(exec).
+		Select("finished_at").
+		SelectRaw("CASE WHEN result IS NULL THEN NULL ELSE result::text END AS result_json").
+		Plan(context.Background())
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	if exec.calls != 0 {
+		t.Fatalf("Plan executed database call count=%d", exec.calls)
+	}
+	if !strings.Contains(plan.SQL, "CASE WHEN result IS NULL THEN NULL ELSE result::text END AS result_json") {
+		t.Fatalf("sql=%q", plan.SQL)
+	}
+}
+
+func TestSelectAllowsIdentifierAndWildcardFields(t *testing.T) {
+	_, err := newPlanTestQuery(&recordingExec{}).
+		Select("id", "users.name", "*", "profiles.*").
+		Plan(context.Background())
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+}
+
+func TestWhereCursorAfterBuildsLexicographicPredicate(t *testing.T) {
+	plan, err := New(&recordingExec{}, "jobs", ormdriver.PostgresDialect{}).
+		Select("id").
+		WhereCursorAfter([]CursorColumn{CursorDesc("due_at"), CursorDesc("id")}, "2026-05-19T00:00:00Z", "job-1").
+		Plan(context.Background())
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	if !strings.Contains(plan.SQL, `"due_at" <`) || !strings.Contains(plan.SQL, `"due_at" =`) || !strings.Contains(plan.SQL, `"id" <`) {
+		t.Fatalf("expected descending cursor predicate, sql=%q", plan.SQL)
+	}
+	if len(plan.Params) != 3 ||
+		plan.Params[0] != "2026-05-19T00:00:00Z" ||
+		plan.Params[1] != "2026-05-19T00:00:00Z" ||
+		plan.Params[2] != "job-1" {
+		t.Fatalf("params=%#v", plan.Params)
+	}
+}
+
+func TestWhereCursorRejectsInvalidInput(t *testing.T) {
+	_, err := newPlanTestQuery(&recordingExec{}).
+		Select("id").
+		WhereCursorAfter([]CursorColumn{CursorAsc("due_at")}, "cursor", 1).
+		Plan(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "cursor column/value count mismatch") {
+		t.Fatalf("expected count mismatch error, got %v", err)
+	}
+}
+
 func TestWritePlanSnapshots(t *testing.T) {
 	ctx := context.Background()
 
