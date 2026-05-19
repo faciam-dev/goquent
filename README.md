@@ -14,8 +14,12 @@ import "github.com/faciam-dev/goquent/orm"
 - [func DeleteBy\(ctx context.Context, base \*query.Query, scopes ...Scope\) \(sql.Result, error\)](<#DeleteBy>)
 - [func GetDriver\(name string\) \(sqldriver.Driver, bool\)](<#GetDriver>)
 - [func Insert\[T any\]\(ctx context.Context, db \*DB, v T, opts ...WriteOpt\) \(sql.Result, error\)](<#Insert>)
+- [func InsertOnceReturning\[T any, V any\]\(ctx context.Context, db \*DB, v V, opts ...WriteOpt\) \(T, bool, error\)](<#InsertOnceReturning>)
 - [func InsertReturning\[T any, V any\]\(ctx context.Context, db \*DB, v V, opts ...WriteOpt\) \(T, error\)](<#InsertReturning>)
 - [func ManifestJSONSchema\(\) \(\[\]byte, error\)](<#ManifestJSONSchema>)
+- [func NullString\(value string\) sql.NullString](<#NullString>)
+- [func NullStringEmpty\(value string\) sql.NullString](<#NullStringEmpty>)
+- [func NullStringPtr\(value \*string\) sql.NullString](<#NullStringPtr>)
 - [func OperationSpecJSONSchema\(\) \(\[\]byte, error\)](<#OperationSpecJSONSchema>)
 - [func RegisterDialect\(name string, d driver.Dialect\)](<#RegisterDialect>)
 - [func RegisterDriver\(name string, d sqldriver.Driver\)](<#RegisterDriver>)
@@ -42,6 +46,9 @@ import "github.com/faciam-dev/goquent/orm"
   - [func \(p BoolScanPolicy\) String\(\) string](<#BoolScanPolicy.String>)
 - [type ColumnRef](<#ColumnRef>)
 - [type ColumnSchema](<#ColumnSchema>)
+- [type CursorColumn](<#CursorColumn>)
+  - [func CursorAsc\(name string\) CursorColumn](<#CursorAsc>)
+  - [func CursorDesc\(name string\) CursorColumn](<#CursorDesc>)
 - [type DB](<#DB>)
   - [func NewDB\(sqlDB \*sql.DB, dialect driver.Dialect, opts ...Option\) \*DB](<#NewDB>)
   - [func Open\(dsn string\) \(\*DB, error\)](<#Open>)
@@ -71,6 +78,13 @@ import "github.com/faciam-dev/goquent/orm"
 - [type Evidence](<#Evidence>)
 - [type FilterSpec](<#FilterSpec>)
 - [type IndexSchema](<#IndexSchema>)
+- [type JSONField](<#JSONField>)
+  - [func JSONNull\[T any\]\(\) JSONField\[T\]](<#JSONNull>)
+  - [func JSONOf\[T any\]\(v T\) JSONField\[T\]](<#JSONOf>)
+  - [func \(j JSONField\[T\]\) OrDefault\(def T\) T](<#JSONField[T].OrDefault>)
+  - [func \(j \*JSONField\[T\]\) Scan\(src any\) error](<#JSONField[T].Scan>)
+  - [func \(j JSONField\[T\]\) Validate\(fn func\(T\) error\) error](<#JSONField[T].Validate>)
+  - [func \(j JSONField\[T\]\) Value\(\) \(driver.Value, error\)](<#JSONField[T].Value>)
 - [type JoinRef](<#JoinRef>)
 - [type Manifest](<#Manifest>)
   - [func GenerateManifest\(opts ManifestOptions\) \(\*Manifest, error\)](<#GenerateManifest>)
@@ -124,6 +138,8 @@ import "github.com/faciam-dev/goquent/orm"
 - [type Schema](<#Schema>)
 - [type Scope](<#Scope>)
   - [func ComposeScopes\(scopes ...Scope\) Scope](<#ComposeScopes>)
+  - [func CursorAfter\(columns \[\]CursorColumn, values ...any\) Scope](<#CursorAfter>)
+  - [func CursorBefore\(columns \[\]CursorColumn, values ...any\) Scope](<#CursorBefore>)
   - [func TenantScope\(tenantID any, column ...string\) Scope](<#TenantScope>)
 - [type SourceLocation](<#SourceLocation>)
 - [type Suppression](<#Suppression>)
@@ -145,6 +161,7 @@ import "github.com/faciam-dev/goquent/orm"
   - [func ConflictColumns\(cols ...string\) WriteOpt](<#ConflictColumns>)
   - [func ConflictConstraint\(name string\) WriteOpt](<#ConflictConstraint>)
   - [func ConflictDoNothing\(\) WriteOpt](<#ConflictDoNothing>)
+  - [func ConflictTargetRaw\(target string\) WriteOpt](<#ConflictTargetRaw>)
   - [func ConflictWhere\(predicate string\) WriteOpt](<#ConflictWhere>)
   - [func Omit\(cols ...string\) WriteOpt](<#Omit>)
   - [func PK\(cols ...string\) WriteOpt](<#PK>)
@@ -332,6 +349,17 @@ func Insert[T any](ctx context.Context, db *DB, v T, opts ...WriteOpt) (sql.Resu
 
 Insert inserts v into its table.
 
+<a name="InsertOnceReturning"></a>
+## func InsertOnceReturning
+
+```go
+func InsertOnceReturning[T any, V any](ctx context.Context, db *DB, v V, opts ...WriteOpt) (T, bool, error)
+```
+
+InsertOnceReturning inserts v once and scans the inserted or existing row.
+
+It uses ON CONFLICT DO NOTHING RETURNING for the insert attempt. If the conflict path returns no row, it looks up the existing row by ConflictColumns or WherePK primary\-key columns. Expression\-only raw conflict targets need ConflictColumns or WherePK as a lookup key.
+
 <a name="InsertReturning"></a>
 ## func InsertReturning
 
@@ -349,6 +377,33 @@ func ManifestJSONSchema() ([]byte, error)
 ```
 
 
+
+<a name="NullString"></a>
+## func NullString
+
+```go
+func NullString(value string) sql.NullString
+```
+
+NullString returns a valid sql.NullString.
+
+<a name="NullStringEmpty"></a>
+## func NullStringEmpty
+
+```go
+func NullStringEmpty(value string) sql.NullString
+```
+
+NullStringEmpty returns NULL when value is empty and a valid sql.NullString otherwise.
+
+<a name="NullStringPtr"></a>
+## func NullStringPtr
+
+```go
+func NullStringPtr(value *string) sql.NullString
+```
+
+NullStringPtr returns NULL when value is nil and a valid sql.NullString otherwise.
 
 <a name="OperationSpecJSONSchema"></a>
 ## func OperationSpecJSONSchema
@@ -593,6 +648,33 @@ type ColumnRef = query.ColumnRef
 ```go
 type ColumnSchema = migration.ColumnSchema
 ```
+
+<a name="CursorColumn"></a>
+## type CursorColumn
+
+CursorColumn describes an ordered column used by keyset cursor scopes.
+
+```go
+type CursorColumn = query.CursorColumn
+```
+
+<a name="CursorAsc"></a>
+### func CursorAsc
+
+```go
+func CursorAsc(name string) CursorColumn
+```
+
+CursorAsc returns an ascending keyset cursor column.
+
+<a name="CursorDesc"></a>
+### func CursorDesc
+
+```go
+func CursorDesc(name string) CursorColumn
+```
+
+CursorDesc returns a descending keyset cursor column.
 
 <a name="DB"></a>
 ## type DB
@@ -864,6 +946,74 @@ type FilterSpec = operation.FilterSpec
 ```go
 type IndexSchema = migration.IndexSchema
 ```
+
+<a name="JSONField"></a>
+## type JSONField
+
+JSONField maps a JSON/JSONB column to a typed Go value.
+
+A NULL database value scans to Valid=false and leaves Data as the zero value. Use OrDefault when repository code wants a stable default for nullable JSON.
+
+```go
+type JSONField[T any] struct {
+    Data  T
+    Valid bool
+}
+```
+
+<a name="JSONNull"></a>
+### func JSONNull
+
+```go
+func JSONNull[T any]() JSONField[T]
+```
+
+JSONNull returns an invalid JSONField that stores as SQL NULL.
+
+<a name="JSONOf"></a>
+### func JSONOf
+
+```go
+func JSONOf[T any](v T) JSONField[T]
+```
+
+JSONOf returns a valid JSONField for v.
+
+<a name="JSONField[T].OrDefault"></a>
+### func \(JSONField\[T\]\) OrDefault
+
+```go
+func (j JSONField[T]) OrDefault(def T) T
+```
+
+OrDefault returns Data when valid, otherwise def.
+
+<a name="JSONField[T].Scan"></a>
+### func \(\*JSONField\[T\]\) Scan
+
+```go
+func (j *JSONField[T]) Scan(src any) error
+```
+
+Scan implements sql.Scanner.
+
+<a name="JSONField[T].Validate"></a>
+### func \(JSONField\[T\]\) Validate
+
+```go
+func (j JSONField[T]) Validate(fn func(T) error) error
+```
+
+Validate runs fn for valid JSON values.
+
+<a name="JSONField[T].Value"></a>
+### func \(JSONField\[T\]\) Value
+
+```go
+func (j JSONField[T]) Value() (driver.Value, error)
+```
+
+Value implements driver.Valuer.
 
 <a name="JoinRef"></a>
 ## type JoinRef
@@ -1346,6 +1496,24 @@ func ComposeScopes(scopes ...Scope) Scope
 
 ComposeScopes bundles scopes into a single reusable scope.
 
+<a name="CursorAfter"></a>
+### func CursorAfter
+
+```go
+func CursorAfter(columns []CursorColumn, values ...any) Scope
+```
+
+CursorAfter adds a keyset pagination predicate after the given cursor.
+
+<a name="CursorBefore"></a>
+### func CursorBefore
+
+```go
+func CursorBefore(columns []CursorColumn, values ...any) Scope
+```
+
+CursorBefore adds a keyset pagination predicate before the given cursor.
+
 <a name="TenantScope"></a>
 ### func TenantScope
 
@@ -1537,6 +1705,23 @@ func ConflictDoNothing() WriteOpt
 ```
 
 ConflictDoNothing makes Upsert/UpsertReturning use a no\-op conflict action.
+
+<a name="ConflictTargetRaw"></a>
+### func ConflictTargetRaw
+
+```go
+func ConflictTargetRaw(target string) WriteOpt
+```
+
+ConflictTargetRaw sets a raw Postgres ON CONFLICT target.
+
+Use this for expression indexes such as:
+
+```
+ConflictTargetRaw(`("tenant_id", COALESCE("target_node_id", '')) WHERE "active"`)
+```
+
+Prefer ConflictColumns, ConflictWhere, or ConflictConstraint when they can express the target.
 
 <a name="ConflictWhere"></a>
 ### func ConflictWhere
@@ -2913,6 +3098,9 @@ import "github.com/faciam-dev/goquent/orm/query"
 - [type AnalysisPrecision](<#AnalysisPrecision>)
 - [type Approval](<#Approval>)
 - [type ColumnRef](<#ColumnRef>)
+- [type CursorColumn](<#CursorColumn>)
+  - [func CursorAsc\(name string\) CursorColumn](<#CursorAsc>)
+  - [func CursorDesc\(name string\) CursorColumn](<#CursorDesc>)
 - [type Evidence](<#Evidence>)
 - [type JoinRef](<#JoinRef>)
 - [type OperationType](<#OperationType>)
@@ -3016,6 +3204,8 @@ import "github.com/faciam-dev/goquent/orm/query"
   - [func \(q \*Query\) WhereBetweenColumns\(col, minCol, maxCol string\) \*Query](<#Query.WhereBetweenColumns>)
   - [func \(q \*Query\) WhereColumn\(col string, args ...string\) \*Query](<#Query.WhereColumn>)
   - [func \(q \*Query\) WhereColumns\(columns \[\]\[\]string\) \*Query](<#Query.WhereColumns>)
+  - [func \(q \*Query\) WhereCursorAfter\(columns \[\]CursorColumn, values ...any\) \*Query](<#Query.WhereCursorAfter>)
+  - [func \(q \*Query\) WhereCursorBefore\(columns \[\]CursorColumn, values ...any\) \*Query](<#Query.WhereCursorBefore>)
   - [func \(q \*Query\) WhereDate\(col, cond, date string\) \*Query](<#Query.WhereDate>)
   - [func \(q \*Query\) WhereDay\(col, cond, day string\) \*Query](<#Query.WhereDay>)
   - [func \(q \*Query\) WhereExists\(sub \*Query\) \*Query](<#Query.WhereExists>)
@@ -3187,6 +3377,36 @@ type ColumnRef struct {
     Function   string `json:"function,omitempty"`
 }
 ```
+
+<a name="CursorColumn"></a>
+## type CursorColumn
+
+CursorColumn describes an ordered column used by keyset cursor predicates.
+
+```go
+type CursorColumn struct {
+    Name      string
+    Direction string
+}
+```
+
+<a name="CursorAsc"></a>
+### func CursorAsc
+
+```go
+func CursorAsc(name string) CursorColumn
+```
+
+CursorAsc returns an ascending keyset cursor column.
+
+<a name="CursorDesc"></a>
+### func CursorDesc
+
+```go
+func CursorDesc(name string) CursorColumn
+```
+
+CursorDesc returns a descending keyset cursor column.
 
 <a name="Evidence"></a>
 ## type Evidence
@@ -3997,7 +4217,7 @@ SafeWhereRaw appends a raw WHERE condition ensuring a values map is always used.
 func (q *Query) Select(cols ...string) *Query
 ```
 
-Select sets selected columns.
+Select sets selected identifier columns. Use SelectRaw for SQL expressions.
 
 <a name="Query.SelectRaw"></a>
 ### func \(\*Query\) SelectRaw
@@ -4160,6 +4380,24 @@ func (q *Query) WhereColumns(columns [][]string) *Query
 ```
 
 WhereColumns adds multiple column comparison conditions joined by AND.
+
+<a name="Query.WhereCursorAfter"></a>
+### func \(\*Query\) WhereCursorAfter
+
+```go
+func (q *Query) WhereCursorAfter(columns []CursorColumn, values ...any) *Query
+```
+
+WhereCursorAfter adds a keyset pagination predicate after the given cursor.
+
+<a name="Query.WhereCursorBefore"></a>
+### func \(\*Query\) WhereCursorBefore
+
+```go
+func (q *Query) WhereCursorBefore(columns []CursorColumn, values ...any) *Query
+```
+
+WhereCursorBefore adds a keyset pagination predicate before the given cursor.
 
 <a name="Query.WhereDate"></a>
 ### func \(\*Query\) WhereDate
